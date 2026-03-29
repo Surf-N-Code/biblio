@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Drawer } from "vaul";
 import { cn } from "@/lib/utils/cn";
 import type { ParsedVerse } from "@/lib/bible/parse-chapter-html";
+import {
+  addVerseNote,
+  type VerseNoteAiKind,
+} from "@/lib/bible/reading-storage";
 
 const HIGHLIGHT_PRESETS = [
   { id: "yellow", label: "Gelb", className: "bg-amber-200/90 dark:bg-amber-900/50" },
@@ -89,6 +93,7 @@ function saveGermanBibleFilePreference(basename: string) {
 
 export type ChapterReaderProps = {
   bookName: string;
+  bookSlug: string;
   usfm: string;
   chapter: number;
   primary: ParsedVerse[];
@@ -100,6 +105,7 @@ export type ChapterReaderProps = {
 
 export function ChapterReader({
   bookName,
+  bookSlug,
   usfm,
   chapter,
   primary,
@@ -117,6 +123,8 @@ export function ChapterReader({
   const [mhLoading, setMhLoading] = useState(false);
   const [germanFiles, setGermanFiles] = useState<{ id: string; label: string }[]>([]);
   const [germanFile, setGermanFile] = useState<string>("");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [lastAiKind, setLastAiKind] = useState<VerseNoteAiKind | undefined>();
 
   useEffect(() => {
     setHighlights(loadHighlights(storageKey));
@@ -246,6 +254,7 @@ export function ChapterReader({
       );
       return;
     }
+    setLastAiKind("german");
     setAiLoading("german");
     setAiPanel(null);
     try {
@@ -279,6 +288,7 @@ export function ChapterReader({
   };
 
   const runExplain = async (detail: "brief" | "extensive") => {
+    setLastAiKind(detail === "brief" ? "explain-brief" : "explain-long");
     setAiLoading(detail === "brief" ? "explain-brief" : "explain-long");
     setAiPanel(null);
     try {
@@ -302,6 +312,7 @@ export function ChapterReader({
   };
 
   const runContext = async () => {
+    setLastAiKind("context");
     setAiLoading("context");
     setAiPanel(null);
     try {
@@ -333,6 +344,49 @@ export function ChapterReader({
     } finally {
       setAiLoading(null);
     }
+  };
+
+  const selectedVerseNums = useMemo(
+    () => [...selected].sort((a, b) => a - b),
+    [selected],
+  );
+
+  const saveUserNoteFromDrawer = () => {
+    const body = noteDraft.trim();
+    if (!body) {
+      setToast("Bitte Notiztext eingeben.");
+      window.setTimeout(() => setToast(null), 2000);
+      return;
+    }
+    addVerseNote({
+      usfm,
+      bookSlug,
+      bookName,
+      chapter,
+      verses: selectedVerseNums,
+      body,
+      source: "user",
+    });
+    setNoteDraft("");
+    setToast("Notiz gespeichert.");
+    window.setTimeout(() => setToast(null), 2000);
+  };
+
+  const saveAiPanelAsNote = () => {
+    const body = aiPanel?.trim();
+    if (!body) return;
+    addVerseNote({
+      usfm,
+      bookSlug,
+      bookName,
+      chapter,
+      verses: selectedVerseNums,
+      body,
+      source: "ai",
+      aiKind: lastAiKind ?? "other",
+    });
+    setToast("KI-Notiz gespeichert.");
+    window.setTimeout(() => setToast(null), 2000);
   };
 
   const highlightClassForVerse = (verseNum: number): string | undefined => {
@@ -410,6 +464,7 @@ export function ChapterReader({
             setSelected(new Set());
             setAiPanel(null);
             setMhText(null);
+            setNoteDraft("");
           }
         }}
       >
@@ -531,6 +586,37 @@ export function ChapterReader({
                 {aiPanel}
               </div>
             )}
+
+            <div className="mt-4 space-y-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Notizen zu dieser Auswahl
+              </p>
+              <textarea
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                rows={3}
+                placeholder="Eigene Notiz …"
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={saveUserNoteFromDrawer}
+                  className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600"
+                >
+                  Eigene Notiz speichern
+                </button>
+                {aiPanel && !aiLoading && (
+                  <button
+                    type="button"
+                    onClick={saveAiPanelAsNote}
+                    className="rounded-full border border-emerald-600 px-3 py-1.5 text-sm text-emerald-800 dark:border-emerald-500 dark:text-emerald-200"
+                  >
+                    KI-Text als Notiz speichern
+                  </button>
+                )}
+              </div>
+            </div>
 
             {toast && (
               <p className="mt-3 text-center text-sm text-emerald-700 dark:text-emerald-400" role="status">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BookChapterGrid } from "@/components/bible/BookChapterGrid";
+import { ReadSubNav } from "@/components/bible/ReadSubNav";
 import { getBookBySlug } from "@/lib/bible/canonical-books";
 
 type PageProps = {
@@ -50,6 +51,7 @@ export default async function ReadBookChaptersPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <article className="mx-auto max-w-5xl px-4 py-10">
+        <ReadSubNav />
         <nav className="mb-6 text-sm text-zinc-600 dark:text-zinc-400" aria-label="Brotkrumen">
           <Link href="/read" className="underline underline-offset-2">
             Lesen

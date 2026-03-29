@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChapterNotesPanel } from "@/components/bible/ChapterNotesPanel";
 import { ChapterReader } from "@/components/bible/ChapterReader";
+import { MarkChapterRead } from "@/components/bible/MarkChapterRead";
+import { ReadSubNav } from "@/components/bible/ReadSubNav";
 import { getBookBySlug } from "@/lib/bible/canonical-books";
 import { loadAmplifiedChapter, loadPrimaryChapter } from "@/lib/bible/api";
 import { getPreviousChaptersContext } from "@/lib/ai/prev-summary";
@@ -64,6 +67,7 @@ export default async function ReadChapterPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <article className="mx-auto max-w-5xl px-4 py-8">
+        <ReadSubNav />
         <nav className="mb-6 text-sm text-zinc-600 dark:text-zinc-400" aria-label="Brotkrumen">
           <Link href="/read" className="underline underline-offset-2">
             Lesen
@@ -78,11 +82,14 @@ export default async function ReadChapterPage({ params }: PageProps) {
           <span className="mx-2">/</span>
           <span className="text-zinc-900 dark:text-zinc-100">{chapter}</span>
         </nav>
-        <header>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {book.name} {chapter}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">{primary.bibleLabel}</p>
+        <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+              {book.name} {chapter}
+            </h1>
+            <p className="mt-1 text-sm text-zinc-500">{primary.bibleLabel}</p>
+          </div>
+          <MarkChapterRead usfm={book.usfm} chapter={chapter} />
         </header>
 
         {prevSummary && (
@@ -97,6 +104,7 @@ export default async function ReadChapterPage({ params }: PageProps) {
         <div className="mt-8">
           <ChapterReader
             bookName={book.name}
+            bookSlug={book.slug}
             usfm={book.usfm}
             chapter={chapter}
             primary={primary.verses}
@@ -105,6 +113,13 @@ export default async function ReadChapterPage({ params }: PageProps) {
             hasMatthewHenry={hasMh}
           />
         </div>
+
+        <ChapterNotesPanel
+          usfm={book.usfm}
+          bookSlug={book.slug}
+          bookName={book.name}
+          chapter={chapter}
+        />
 
         <nav
           className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6 text-sm dark:border-zinc-800"
