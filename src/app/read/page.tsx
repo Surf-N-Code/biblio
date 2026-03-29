@@ -13,7 +13,7 @@ export default function ReadIndexPage() {
         Buch wählen
       </h1>
       <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-        Öffnet Kapitel 1 — dort kannst du zwischen Kapiteln wechseln.
+        Wähle ein Buch, dann ein Kapitel — oder blättere dort mit den Pfeilen weiter.
       </p>
       <SortableBookList />
     </div>

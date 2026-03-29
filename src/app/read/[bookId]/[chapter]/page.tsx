@@ -69,7 +69,14 @@ export default async function ReadChapterPage({ params }: PageProps) {
             Lesen
           </Link>
           <span className="mx-2">/</span>
-          <span>{book.name}</span>
+          <Link
+            href={`/read/${book.slug}`}
+            className="underline underline-offset-2"
+          >
+            {book.name}
+          </Link>
+          <span className="mx-2">/</span>
+          <span className="text-zinc-900 dark:text-zinc-100">{chapter}</span>
         </nav>
         <header>
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -100,7 +107,7 @@ export default async function ReadChapterPage({ params }: PageProps) {
         </div>
 
         <nav
-          className="mt-10 flex flex-wrap justify-between gap-4 border-t border-zinc-200 pt-6 text-sm dark:border-zinc-800"
+          className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6 text-sm dark:border-zinc-800"
           aria-label="Kapitelnavigation"
         >
           {chapter > 1 ? (
@@ -111,8 +118,14 @@ export default async function ReadChapterPage({ params }: PageProps) {
               ← Kapitel {chapter - 1}
             </Link>
           ) : (
-            <span />
+            <span className="min-w-[1ch]" />
           )}
+          <Link
+            href={`/read/${book.slug}`}
+            className="text-zinc-600 underline underline-offset-2 dark:text-zinc-400"
+          >
+            Alle Kapitel
+          </Link>
           {chapter < book.chapters ? (
             <Link
               href={`/read/${book.slug}/${chapter + 1}`}
@@ -121,7 +134,7 @@ export default async function ReadChapterPage({ params }: PageProps) {
               Kapitel {chapter + 1} →
             </Link>
           ) : (
-            <span />
+            <span className="min-w-[1ch]" />
           )}
         </nav>
       </article>

@@ -57,7 +57,7 @@ export function SortableBookList() {
         {books.map((b) => (
           <li key={b.slug} className="mb-2 break-inside-avoid">
             <Link
-              href={`/read/${b.slug}/1`}
+              href={`/read/${b.slug}`}
               className="text-zinc-800 underline underline-offset-2 hover:text-zinc-600 dark:text-zinc-200 dark:hover:text-zinc-100"
             >
               {b.name}
