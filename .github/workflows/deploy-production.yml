@@ -1,0 +1,63 @@
+# Deploy to Vercel production on every push to main (e.g. after merging a Builder PR).
+# Requires GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+# Get them from Vercel: Project Settings → General (Project ID, Org ID), Account → Tokens (token).
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      feature_description:
+        description: "What you are shipping (logged in the workflow summary)"
+        required: false
+        default: ""
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deployment context
+        env:
+          FEATURE_NOTE: ${{ github.event.inputs.feature_description }}
+        run: |
+          {
+            echo "## Production deploy"
+            echo ""
+            echo "**Trigger:** ${{ github.event_name }}"
+            echo ""
+            echo "**Feature / release note:**"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$FEATURE_NOTE" ]; then
+              printf '%s\n' "$FEATURE_NOTE"
+            else
+              echo "(automatic deploy from push to main — no manual note)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull Vercel env and build
+        run: |
+          pnpm add -g vercel@latest
+          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+          vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy to Vercel production
+        run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"

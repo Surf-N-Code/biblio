@@ -1,0 +1,97 @@
+name: Build Feature
+
+on:
+  repository_dispatch:
+    types: [build-feature]
+  workflow_dispatch:
+    # Optional: manual trigger for testing
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Create feature branch
+        run: |
+          BRANCH="feature/build-${{ github.event.client_payload.id || github.run_id }}"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git checkout -b "$BRANCH"
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+      - name: Run Claude Code to implement feature
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are implementing a feature for Biblio — a Next.js Bible reading PWA (German UI, optional English copy in code comments).
+
+            Feature request: ${{ github.event.client_payload.description || 'Improve the application' }}
+
+            Codebase overview:
+            - Next.js App Router: src/app/ (pages, layouts, route handlers)
+            - React components: src/components/
+            - Shared logic: src/lib/
+            - API routes: src/app/api/**/route.ts
+            - Tailwind CSS v4, Geist fonts, dark/light via ThemeProvider
+            - Package manager: pnpm (repo root)
+
+            Instructions:
+            - Implement the feature with minimal, focused changes
+            - Match existing patterns (Server Components where appropriate, "use client" only when needed)
+            - Do not drop database tables or delete large data files without explicit user direction
+            - Verify TypeScript: pnpm exec tsc --noEmit
+            - Verify production build: pnpm run build
+          claude_args: "--allowedTools Edit,Write,Bash,Read,Glob,Grep"
+
+      - name: Commit changes
+        env:
+          FEAT_LINE: ${{ github.event.client_payload.description || 'Feature implementation' }}
+        run: |
+          # Ensure .cache and other ignored dirs are never committed (Claude/sandbox may create them)
+          git rm -r --cached .cache 2>/dev/null || true
+          git rm -r --cached .next 2>/dev/null || true
+          git rm -r --cached .cursor 2>/dev/null || true
+          rm -rf .cache .cursor 2>/dev/null || true
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            SUBJECT=$(printf '%s' "$FEAT_LINE" | tr '\n' ' ' | cut -c1-100)
+            git commit -m "feat: ${SUBJECT}"
+          fi
+
+      - name: Push branch
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git remote set-url origin "https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git"
+          git push origin "$BRANCH"
+
+      - name: Create Pull Request
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          export GH_TOKEN="${GH_PAT}"
+          DESC=$(jq -r '.client_payload.description // "Feature implementation"' "$GITHUB_EVENT_PATH")
+          FEAT_ID=$(jq -r '.client_payload.id // empty' "$GITHUB_EVENT_PATH")
+          RID="${FEAT_ID:-${{ github.run_id }}}"
+          TITLE=$(printf '%.120s' "$DESC")
+          gh pr create \
+            --title "feat: ${TITLE}" \
+            --body "## Feature Request
+
+          ${DESC}
+
+          ---
+          Feature ID: \`${RID}\`
+          Implemented by Claude Code via GitHub Actions." \
+            --base main \
+            --head "$BRANCH"
