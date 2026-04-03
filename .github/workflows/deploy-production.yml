@@ -62,10 +62,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Use npx (not pnpm dlx) so the CLI inherits env reliably; pass --token explicitly
+      # (some Vercel versions resolve credentials before reading VERCEL_TOKEN in non-TTY).
       - name: Pull Vercel env and build
         run: |
-          pnpm dlx vercel@latest pull --yes --environment=production
-          pnpm dlx vercel@latest build --prod
+          npx --yes vercel@latest pull --yes --environment=production --token "${{ secrets.VERCEL_TOKEN }}"
+          npx --yes vercel@latest build --prod --token "${{ secrets.VERCEL_TOKEN }}"
 
       - name: Deploy to Vercel production
-        run: pnpm dlx vercel@latest deploy --prebuilt --prod
+        run: npx --yes vercel@latest deploy --prebuilt --prod --token "${{ secrets.VERCEL_TOKEN }}"
