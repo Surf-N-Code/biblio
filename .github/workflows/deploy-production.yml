@@ -3,6 +3,10 @@
 # Get them from Vercel: Project Settings → General (Project ID, Org ID), Account → Tokens (token).
 name: Deploy Production
 
+concurrency:
+  group: deploy-production-${{ github.ref }}
+  cancel-in-progress: false
+
 on:
   push:
     branches:

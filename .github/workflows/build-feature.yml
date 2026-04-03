@@ -4,7 +4,15 @@ on:
   repository_dispatch:
     types: [build-feature]
   workflow_dispatch:
-    # Optional: manual trigger for testing
+    inputs:
+      description:
+        description: "Feature description (for manual test runs)"
+        required: false
+        default: ""
+      id:
+        description: "Optional feature id (defaults to run id)"
+        required: false
+        default: ""
 
 jobs:
   build:
@@ -20,20 +28,33 @@ jobs:
 
       - name: Create feature branch
         run: |
-          BRANCH="feature/build-${{ github.event.client_payload.id || github.run_id }}"
+          BRANCH="feature/build-${{ github.event.client_payload.id || github.event.inputs.id || github.run_id }}"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git checkout -b "$BRANCH"
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Run Claude Code to implement feature
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
           prompt: |
             You are implementing a feature for Biblio — a Next.js Bible reading PWA (German UI, optional English copy in code comments).
 
-            Feature request: ${{ github.event.client_payload.description || 'Improve the application' }}
+            Feature request: ${{ github.event.client_payload.description || github.event.inputs.description || 'Improve the application' }}
 
             Codebase overview:
             - Next.js App Router: src/app/ (pages, layouts, route handlers)
@@ -53,7 +74,7 @@ jobs:
 
       - name: Commit changes
         env:
-          FEAT_LINE: ${{ github.event.client_payload.description || 'Feature implementation' }}
+          FEAT_LINE: ${{ github.event.client_payload.description || github.event.inputs.description || 'Feature implementation' }}
         run: |
           # Ensure .cache and other ignored dirs are never committed (Claude/sandbox may create them)
           git rm -r --cached .cache 2>/dev/null || true
@@ -80,9 +101,24 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           export GH_TOKEN="${GH_PAT}"
-          DESC=$(jq -r '.client_payload.description // "Feature implementation"' "$GITHUB_EVENT_PATH")
-          FEAT_ID=$(jq -r '.client_payload.id // empty' "$GITHUB_EVENT_PATH")
-          RID="${FEAT_ID:-${{ github.run_id }}}"
+          # workflow_dispatch has no client_payload — jq must not index null
+          DESC=$(jq -r '
+            if (.client_payload | type) == "object" and (.client_payload.description | type) == "string" and (.client_payload.description | length) > 0
+            then .client_payload.description
+            elif (.inputs | type) == "object" and (.inputs.description | type) == "string" and (.inputs.description | length) > 0
+            then .inputs.description
+            else "Feature implementation"
+            end
+          ' "$GITHUB_EVENT_PATH")
+          FEAT_ID=$(jq -r '
+            if (.client_payload | type) == "object" and .client_payload.id != null and ((.client_payload.id | tostring) | length) > 0
+            then (.client_payload.id | tostring)
+            elif (.inputs | type) == "object" and .inputs.id != null and ((.inputs.id | tostring) | length) > 0
+            then (.inputs.id | tostring)
+            else empty
+            end
+          ' "$GITHUB_EVENT_PATH")
+          RID="${FEAT_ID:-$GITHUB_RUN_ID}"
           TITLE=$(printf '%.120s' "$DESC")
           gh pr create \
             --title "feat: ${TITLE}" \
