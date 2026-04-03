@@ -152,7 +152,11 @@ export function ChapterReader({
   }, []);
 
   useEffect(() => {
-    setDrawerOpen(selected.size > 0);
+    if (selected.size === 0) setDrawerOpen(false);
+  }, [selected.size]);
+
+  useEffect(() => {
+    if (selected.size >= 2) setDrawerOpen(true);
   }, [selected.size]);
 
   const selectedVersesKey = useMemo(
@@ -395,8 +399,28 @@ export function ChapterReader({
     return HIGHLIGHT_PRESETS.find((h) => h.id === id)?.className;
   };
 
+  const showSingleVerseBar = selected.size === 1 && !drawerOpen;
+
   return (
     <div className="w-full">
+      {showSingleVerseBar && (
+        <div
+          className="fixed z-30 flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white/95 px-3 py-2.5 shadow-lg backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-950/95 left-4 right-4 max-w-lg mx-auto"
+          style={{ bottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
+        >
+          <p className="text-sm text-zinc-700 dark:text-zinc-200">
+            1 Vers — wähle weitere oder öffne die Werkzeuge.
+          </p>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="shrink-0 rounded-full bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            Werkzeuge
+          </button>
+        </div>
+      )}
+
       <div
         className={cn(
           "grid gap-6 lg:gap-10",
@@ -470,7 +494,7 @@ export function ChapterReader({
       >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[88vh] flex-col rounded-t-2xl border border-zinc-200 bg-white p-4 pb-8 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
+          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[96vh] min-h-0 flex-col overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl dark:border-zinc-800 dark:bg-zinc-950 max-sm:min-h-[80vh] sm:max-h-[88vh] sm:p-4 sm:pb-8">
             <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
             <Drawer.Title className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
               Ausgewählte Verse
@@ -479,19 +503,19 @@ export function ChapterReader({
               {reference}
             </Drawer.Description>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
               {HIGHLIGHT_PRESETS.map((h) => (
                 <button
                   key={h.id}
                   type="button"
                   onClick={() => applyHighlight(h.id)}
+                  aria-label={`Markierung: ${h.label}`}
+                  title={h.label}
                   className={cn(
-                    "rounded-full px-3 py-1.5 text-sm font-medium ring-1 ring-zinc-300 dark:ring-zinc-600",
+                    "h-7 w-7 shrink-0 rounded-full ring-2 ring-zinc-400 ring-offset-2 ring-offset-white dark:ring-zinc-500 dark:ring-offset-zinc-950 sm:h-8 sm:w-8",
                     h.className,
                   )}
-                >
-                  {h.label}
-                </button>
+                />
               ))}
               <button
                 type="button"
@@ -508,16 +532,20 @@ export function ChapterReader({
                 Snippet speichern
               </button>
               {germanFiles.length > 0 && (
-                <label className="flex w-full min-w-[12rem] flex-col gap-1 text-xs text-zinc-600 dark:text-zinc-400 sm:w-auto">
-                  <span className="sr-only">Deutsche Bibel-Datei</span>
+                <div className="flex w-full items-center gap-1.5 sm:w-auto">
+                  <label className="sr-only" htmlFor="biblio-german-file">
+                    Deutsche Bibel-Datei
+                  </label>
                   <select
+                    id="biblio-german-file"
                     value={germanFile}
                     onChange={(e) => {
                       const v = e.target.value;
                       setGermanFile(v);
                       if (v) saveGermanBibleFilePreference(v);
                     }}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                    className="max-w-[9rem] shrink rounded-md border border-zinc-300 bg-white py-1 pl-1.5 pr-6 text-[11px] leading-tight text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 sm:max-w-[11rem] sm:text-xs"
+                    title="Übersetzung für „Deutsche Bibel“"
                   >
                     {germanFiles.map((f) => (
                       <option key={f.id} value={f.id}>
@@ -525,16 +553,18 @@ export function ChapterReader({
                       </option>
                     ))}
                   </select>
-                </label>
+                  <button
+                    type="button"
+                    onClick={runGermanPassage}
+                    disabled={!!aiLoading || !germanFile}
+                    aria-label="Ausgewählte Verse in deutscher Bibel anzeigen"
+                    title="Deutsche Bibel"
+                    className="shrink-0 rounded-full border border-zinc-300 px-2 py-1 text-[11px] font-medium dark:border-zinc-600 disabled:opacity-50 sm:px-2.5 sm:text-xs"
+                  >
+                    {aiLoading === "german" ? "…" : "DE"}
+                  </button>
+                </div>
               )}
-              <button
-                type="button"
-                onClick={runGermanPassage}
-                disabled={!!aiLoading || !germanFile}
-                className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600 disabled:opacity-50"
-              >
-                {aiLoading === "german" ? "…" : "Deutsche Bibel"}
-              </button>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -582,7 +612,7 @@ export function ChapterReader({
             )}
 
             {aiPanel && (
-              <div className="mt-4 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100">
+              <div className="mt-3 max-h-[min(52vh,22rem)] min-h-[8rem] overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 sm:mt-4 sm:max-h-48 sm:min-h-0">
                 {aiPanel}
               </div>
             )}
@@ -596,7 +626,7 @@ export function ChapterReader({
                 onChange={(e) => setNoteDraft(e.target.value)}
                 rows={3}
                 placeholder="Eigene Notiz …"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                className="w-full min-h-[7.5rem] rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 sm:min-h-0"
               />
               <div className="flex flex-wrap gap-2">
                 <button

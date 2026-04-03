@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChapterNotesPanel } from "@/components/bible/ChapterNotesPanel";
 import { ChapterReader } from "@/components/bible/ChapterReader";
+import { ChapterSwipeNav } from "@/components/bible/ChapterSwipeNav";
 import { MarkChapterRead } from "@/components/bible/MarkChapterRead";
 import { ReadSubNav } from "@/components/bible/ReadSubNav";
 import { getBookBySlug } from "@/lib/bible/canonical-books";
@@ -92,34 +93,40 @@ export default async function ReadChapterPage({ params }: PageProps) {
           <MarkChapterRead usfm={book.usfm} chapter={chapter} />
         </header>
 
-        {prevSummary && (
-          <aside className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-200">
-            <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-              Kontext aus vorherigen Kapiteln
-            </h2>
-            <p className="mt-2 whitespace-pre-wrap">{prevSummary}</p>
-          </aside>
-        )}
-
-        <div className="mt-8">
-          <ChapterReader
-            bookName={book.name}
-            bookSlug={book.slug}
-            usfm={book.usfm}
-            chapter={chapter}
-            primary={primary.verses}
-            amplified={amplified}
-            storageKey={storageKey}
-            hasMatthewHenry={hasMh}
-          />
-        </div>
-
-        <ChapterNotesPanel
-          usfm={book.usfm}
+        <ChapterSwipeNav
           bookSlug={book.slug}
-          bookName={book.name}
           chapter={chapter}
-        />
+          maxChapter={book.chapters}
+        >
+          {prevSummary && (
+            <aside className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-200">
+              <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+                Kontext aus vorherigen Kapiteln
+              </h2>
+              <p className="mt-2 whitespace-pre-wrap">{prevSummary}</p>
+            </aside>
+          )}
+
+          <div className="mt-8">
+            <ChapterReader
+              bookName={book.name}
+              bookSlug={book.slug}
+              usfm={book.usfm}
+              chapter={chapter}
+              primary={primary.verses}
+              amplified={amplified}
+              storageKey={storageKey}
+              hasMatthewHenry={hasMh}
+            />
+          </div>
+
+          <ChapterNotesPanel
+            usfm={book.usfm}
+            bookSlug={book.slug}
+            bookName={book.name}
+            chapter={chapter}
+          />
+        </ChapterSwipeNav>
 
         <nav
           className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6 text-sm dark:border-zinc-800"
