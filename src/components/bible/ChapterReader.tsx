@@ -155,10 +155,6 @@ export function ChapterReader({
     if (selected.size === 0) setDrawerOpen(false);
   }, [selected.size]);
 
-  useEffect(() => {
-    if (selected.size >= 2) setDrawerOpen(true);
-  }, [selected.size]);
-
   const selectedVersesKey = useMemo(
     () =>
       [...selected]
@@ -399,17 +395,19 @@ export function ChapterReader({
     return HIGHLIGHT_PRESETS.find((h) => h.id === id)?.className;
   };
 
-  const showSingleVerseBar = selected.size === 1 && !drawerOpen;
+  const showSelectionBar = selected.size > 0 && !drawerOpen;
 
   return (
     <div className="w-full">
-      {showSingleVerseBar && (
+      {showSelectionBar && (
         <div
           className="fixed z-30 flex items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white/95 px-3 py-2.5 shadow-lg backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-950/95 left-4 right-4 max-w-lg mx-auto"
           style={{ bottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
         >
           <p className="text-sm text-zinc-700 dark:text-zinc-200">
-            1 Vers — wähle weitere oder öffne die Werkzeuge.
+            {selected.size === 1
+              ? "1 Vers — weitere wählen oder Werkzeuge öffnen."
+              : `${selected.size} Verse ausgewählt — Werkzeuge öffnen.`}
           </p>
           <button
             type="button"
