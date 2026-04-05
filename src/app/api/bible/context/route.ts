@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       {
         role: "system",
         content:
-          "Du gibst historischen und literarischen Kontext zu Bibelstellen auf Deutsch (du-Form): Zeit, Ort, Genre, Anschluss an das Vorangehende. Nutze den Matthew-Henry-Auszug nur als eine historische Stimme unter anderen, nicht als alleinige Autorität. Neutral und knapp, mit Aufzählungspunkten wenn sinnvoll.",
+          "Du gibst historischen und literarischen Kontext zu Bibelstellen auf Deutsch (du-Form): Zeit, Ort, Genre, Anschluss an das Vorangehende. Nutze den Matthew-Henry-Auszug nur als eine historische Stimme unter anderen, nicht als alleinige Autorität. Neutral und knapp. Formatiere in Markdown (##, **fett**, Listen mit -). Kein Code-Block um den gesamten Text.",
       },
       {
         role: "user",

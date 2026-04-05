@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     messages: [
       {
         role: "system",
-        content: `Du bist ein Bibellektor. ${instruction} Keine Predigt, keine persönliche Seelsorge.`,
+        content: `Du bist ein Bibellektor. ${instruction} Keine Predigt, keine persönliche Seelsorge. Formatiere die Antwort in Markdown (z. B. ## für Abschnitte, **fett** für Kernbegriffe, Aufzählungen mit -). Kein Code-Block um den gesamten Text.`,
       },
       {
         role: "user",

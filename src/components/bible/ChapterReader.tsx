@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
+import { AiMarkdownModal } from "@/components/bible/AiMarkdownModal";
 import { cn } from "@/lib/utils/cn";
 import type { ParsedVerse } from "@/lib/bible/parse-chapter-html";
 import {
@@ -75,21 +76,75 @@ function saveSnippets(items: Snippet[]) {
   localStorage.setItem("biblio-snippets", JSON.stringify(items.slice(0, 200)));
 }
 
-const GERMAN_BIBLE_FILE_KEY = "biblio-german-bible-file";
+/** Default German text file in `data/bibles` (Luther 1912). */
+const DEFAULT_GERMAN_BIBLE_FILE = "de_luther1912.txt";
 
-function loadGermanBibleFilePreference(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const v = localStorage.getItem(GERMAN_BIBLE_FILE_KEY);
-    return v?.trim() || null;
-  } catch {
-    return null;
-  }
+function IconCopy(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.793-2.023 1.839-.088.738.054 1.46.449 2.101.36.59.85 1.093 1.438 1.406A2.25 2.25 0 0 1 6 7.228V19.5a2.25 2.25 0 0 0 2.25 2.25h9.75A2.25 2.25 0 0 0 20 19.5V9.75a2.25 2.25 0 0 0-2.25-2.25h-.584m0 0A2.251 2.251 0 0 0 15.75 4.5h-1.5a2.251 2.251 0 0 0-2.15 1.586m0 0V6a2.25 2.25 0 0 0 2.25 2.25h1.5"
+      />
+    </svg>
+  );
 }
 
-function saveGermanBibleFilePreference(basename: string) {
-  localStorage.setItem(GERMAN_BIBLE_FILE_KEY, basename);
+function IconBookmarkSave(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+    </svg>
+  );
 }
+
+function IconLanguageDe(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m10.5 21 5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138v.002c0 1.007-.116 1.998-.347 2.964M6 21h12" />
+    </svg>
+  );
+}
+
+function IconBoltBrief(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
+      />
+    </svg>
+  );
+}
+
+function IconBookLong(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v15.128A9.114 9.114 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 0-6-2.292c-1.052 0-2.062.18-3 .512v15.128a8.966 8.966 0 0 0 6 2.292m0-14.25v14.25"
+      />
+    </svg>
+  );
+}
+
+function IconContext(props: { className?: string }) {
+  return (
+    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+      <circle cx="12" cy="12" r="8.25" />
+    </svg>
+  );
+}
+
+const toolbarIconBtnClass =
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-800 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900";
+
+/** `flex` (not inline-flex) keeps a stable box inside scrollable flex rows; min size matches touch targets. */
+const kiIconBtnClass =
+  "box-border flex h-14 min-h-14 w-14 min-w-14 shrink-0 items-center justify-center rounded-full bg-zinc-900 p-0 leading-none text-white transition-colors hover:bg-zinc-800 disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200";
 
 export type ChapterReaderProps = {
   bookName: string;
@@ -121,35 +176,21 @@ export function ChapterReader({
   const [toast, setToast] = useState<string | null>(null);
   const [mhText, setMhText] = useState<string | null>(null);
   const [mhLoading, setMhLoading] = useState(false);
-  const [germanFiles, setGermanFiles] = useState<{ id: string; label: string }[]>([]);
-  const [germanFile, setGermanFile] = useState<string>("");
   const [noteDraft, setNoteDraft] = useState("");
   const [lastAiKind, setLastAiKind] = useState<VerseNoteAiKind | undefined>();
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const prevAiLoading = useRef<string | null>(null);
 
   useEffect(() => {
     setHighlights(loadHighlights(storageKey));
   }, [storageKey]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/bible/german/list", { signal: controller.signal })
-      .then((r) => r.json() as Promise<{ files?: { id: string; label: string }[] }>)
-      .then((j) => {
-        const files = j.files ?? [];
-        setGermanFiles(files);
-        const saved = loadGermanBibleFilePreference();
-        const fallback =
-          files.find((f) => f.id === "de_luther1912.txt")?.id ?? files[0]?.id ?? "";
-        const pick =
-          saved && files.some((f) => f.id === saved) ? saved : fallback;
-        setGermanFile(pick);
-      })
-      .catch(() => {
-        setGermanFiles([]);
-        setGermanFile("");
-      });
-    return () => controller.abort();
-  }, []);
+    if (prevAiLoading.current && aiLoading === null && aiPanel?.trim()) {
+      setAiModalOpen(true);
+    }
+    prevAiLoading.current = aiLoading;
+  }, [aiLoading, aiPanel]);
 
   useEffect(() => {
     if (selected.size === 0) setDrawerOpen(false);
@@ -248,12 +289,6 @@ export function ChapterReader({
   };
 
   const runGermanPassage = async () => {
-    if (!germanFile) {
-      setAiPanel(
-        "Keine deutsche Bibel-Datei (de_*.txt) im Ordner data/bibles gefunden.",
-      );
-      return;
-    }
     setLastAiKind("german");
     setAiLoading("german");
     setAiPanel(null);
@@ -262,7 +297,7 @@ export function ChapterReader({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          file: germanFile,
+          file: DEFAULT_GERMAN_BIBLE_FILE,
           usfm,
           chapter,
           verses: selectedVersesKey,
@@ -479,12 +514,14 @@ export function ChapterReader({
       </div>
 
       <Drawer.Root
+        shouldScaleBackground={false}
         open={drawerOpen && selected.size > 0}
         onOpenChange={(open) => {
           setDrawerOpen(open);
           if (!open) {
             setSelected(new Set());
             setAiPanel(null);
+            setAiModalOpen(false);
             setMhText(null);
             setNoteDraft("");
           }
@@ -515,80 +552,85 @@ export function ChapterReader({
                   )}
                 />
               ))}
-              <button
-                type="button"
-                onClick={copySelection}
-                className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600"
-              >
-                Kopieren
-              </button>
-              <button
-                type="button"
-                onClick={saveSnippet}
-                className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600"
-              >
-                Snippet speichern
-              </button>
-              {germanFiles.length > 0 && (
-                <div className="flex w-full items-center gap-1.5 sm:w-auto">
-                  <label className="sr-only" htmlFor="biblio-german-file">
-                    Deutsche Bibel-Datei
-                  </label>
-                  <select
-                    id="biblio-german-file"
-                    value={germanFile}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setGermanFile(v);
-                      if (v) saveGermanBibleFilePreference(v);
-                    }}
-                    className="max-w-[9rem] shrink rounded-md border border-zinc-300 bg-white py-1 pl-1.5 pr-6 text-[11px] leading-tight text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 sm:max-w-[11rem] sm:text-xs"
-                    title="Übersetzung für „Deutsche Bibel“"
-                  >
-                    {germanFiles.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={runGermanPassage}
-                    disabled={!!aiLoading || !germanFile}
-                    aria-label="Ausgewählte Verse in deutscher Bibel anzeigen"
-                    title="Deutsche Bibel"
-                    className="shrink-0 rounded-full border border-zinc-300 px-2 py-1 text-[11px] font-medium dark:border-zinc-600 disabled:opacity-50 sm:px-2.5 sm:text-xs"
-                  >
-                    {aiLoading === "german" ? "…" : "DE"}
-                  </button>
-                </div>
-              )}
+              <span className="mx-1 hidden h-6 w-px shrink-0 bg-zinc-200 sm:mx-2 sm:inline dark:bg-zinc-700" aria-hidden />
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={copySelection}
+                  className={toolbarIconBtnClass}
+                  aria-label="Auswahl kopieren"
+                  title="Kopieren"
+                >
+                  <IconCopy className="h-[1.125rem] w-[1.125rem]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={saveSnippet}
+                  className={toolbarIconBtnClass}
+                  aria-label="Snippet speichern"
+                  title="Snippet speichern"
+                >
+                  <IconBookmarkSave className="h-[1.125rem] w-[1.125rem]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={runGermanPassage}
+                  disabled={!!aiLoading}
+                  className={toolbarIconBtnClass}
+                  aria-label="Ausgewählte Verse in deutscher Bibel (Luther 1912) anzeigen"
+                  title="Deutsch · Luther 1912"
+                >
+                  {aiLoading === "german" ? (
+                    <span className="text-xs font-semibold tabular-nums">…</span>
+                  ) : (
+                    <IconLanguageDe className="h-[1.125rem] w-[1.125rem]" />
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex min-h-14 flex-nowrap items-center justify-start gap-2 overflow-x-auto py-1">
               <button
                 type="button"
                 onClick={() => runExplain("brief")}
                 disabled={!!aiLoading}
-                className="rounded-full bg-zinc-900 px-3 py-1.5 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900 disabled:opacity-50"
+                className={kiIconBtnClass}
+                aria-label="KI: kurz erklären"
+                title="KI: kurz erklären"
               >
-                {aiLoading === "explain-brief" ? "…" : "KI: kurz erklären"}
+                {aiLoading === "explain-brief" ? (
+                  <span className="text-sm font-semibold">…</span>
+                ) : (
+                  <IconBoltBrief className="h-4 w-4 shrink-0" />
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => runExplain("extensive")}
                 disabled={!!aiLoading}
-                className="rounded-full bg-zinc-900 px-3 py-1.5 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900 disabled:opacity-50"
+                className={kiIconBtnClass}
+                aria-label="KI: ausführlich erklären"
+                title="KI: ausführlich erklären"
               >
-                {aiLoading === "explain-long" ? "…" : "KI: ausführlich erklären"}
+                {aiLoading === "explain-long" ? (
+                  <span className="text-sm font-semibold">…</span>
+                ) : (
+                  <IconBookLong className="h-4 w-4 shrink-0" />
+                )}
               </button>
               <button
                 type="button"
                 onClick={runContext}
                 disabled={!!aiLoading}
-                className="rounded-full bg-zinc-900 px-3 py-1.5 text-sm text-white dark:bg-zinc-100 dark:text-zinc-900 disabled:opacity-50"
+                className={kiIconBtnClass}
+                aria-label="Mehr Kontext"
+                title="Mehr Kontext"
               >
-                {aiLoading === "context" ? "…" : "Mehr Kontext"}
+                {aiLoading === "context" ? (
+                  <span className="text-sm font-semibold">…</span>
+                ) : (
+                  <IconContext className="h-4 w-4 shrink-0" />
+                )}
               </button>
             </div>
 
@@ -609,9 +651,23 @@ export function ChapterReader({
               </div>
             )}
 
-            {aiPanel && (
-              <div className="mt-3 max-h-[min(52vh,22rem)] min-h-[8rem] overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 sm:mt-4 sm:max-h-48 sm:min-h-0">
-                {aiPanel}
+            {aiLoading && (
+              <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400" aria-live="polite">
+                KI-Antwort wird geladen …
+              </p>
+            )}
+            {aiPanel && !aiLoading && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-800 dark:bg-zinc-900/80">
+                <p className="min-w-0 flex-1 text-sm text-zinc-600 dark:text-zinc-300">
+                  KI-Antwort ist bereit (Markdown).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAiModalOpen(true)}
+                  className="shrink-0 rounded-full bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                >
+                  Im Fenster anzeigen
+                </button>
               </div>
             )}
 
@@ -654,6 +710,12 @@ export function ChapterReader({
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
+
+      <AiMarkdownModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        markdown={aiPanel}
+      />
     </div>
   );
 }
