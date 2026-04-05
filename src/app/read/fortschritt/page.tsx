@@ -6,6 +6,7 @@ import { CANONICAL_BOOKS } from "@/lib/bible/canonical-books";
 import {
   getReadChapterKeys,
   getReadingStats,
+  initReadProgressSync,
   TOTAL_BIBLE_CHAPTERS,
 } from "@/lib/bible/reading-storage";
 import { ReadSubNav } from "@/components/bible/ReadSubNav";
@@ -23,7 +24,7 @@ export default function ReadFortschrittPage() {
       setStats(getReadingStats());
       setReadKeys(getReadChapterKeys());
     };
-    sync();
+    void initReadProgressSync().then(sync);
     window.addEventListener("biblio-read-changed", sync);
     return () => window.removeEventListener("biblio-read-changed", sync);
   }, []);
@@ -52,7 +53,7 @@ export default function ReadFortschrittPage() {
         Lesefortschritt
       </h1>
       <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-        Markierte Kapitel zählen für die Statistik. Die Daten liegen nur in diesem Browser (localStorage).
+        Markierte Kapitel zählen für die Statistik. Im Browser nutzt die App localStorage; mit Konto und Redis auf dem Server kann der Fortschritt zusätzlich synchronisiert werden (dafür musst Du angemeldet sein).
       </p>
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/40">

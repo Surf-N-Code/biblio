@@ -1,8 +1,13 @@
 import { CANONICAL_BOOKS } from "./canonical-books";
 
 const READ_KEY = "biblio-read-chapters";
+const READER_ID_KEY = "biblio-reader-id";
 const NOTES_KEY = "biblio-verse-notes";
 const MAX_NOTES = 2000;
+
+let remoteReadProgressEnabled = false;
+let readProgressSyncPromise: Promise<void> | null = null;
+let remoteSaveTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** Protestant canon: total chapter count for progress. */
 export const TOTAL_BIBLE_CHAPTERS = CANONICAL_BOOKS.reduce((s, b) => s + b.chapters, 0);
@@ -39,6 +44,86 @@ function dispatchReadChanged() {
   window.dispatchEvent(new CustomEvent("biblio-read-changed"));
 }
 
+export function getOrCreateReaderId(): string {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem(READER_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(READER_ID_KEY, id);
+  }
+  return id;
+}
+
+async function fetchReadProgressFromApi(): Promise<{
+  synced: boolean;
+  keys: string[];
+}> {
+  const id = getOrCreateReaderId();
+  if (!id) return { synced: false, keys: [] };
+  const res = await fetch("/api/bible/read-progress", {
+    headers: { "X-Biblio-Reader-Id": id },
+    cache: "no-store",
+  });
+  if (!res.ok) return { synced: false, keys: [] };
+  return res.json() as Promise<{ synced: boolean; keys: string[] }>;
+}
+
+async function pushReadProgressToApi(keys: string[]): Promise<void> {
+  if (!remoteReadProgressEnabled) return;
+  const id = getOrCreateReaderId();
+  if (!id) return;
+  const unique = [...new Set(keys)].sort();
+  await fetch("/api/bible/read-progress", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Biblio-Reader-Id": id,
+    },
+    body: JSON.stringify({ keys: unique }),
+    cache: "no-store",
+  });
+}
+
+function scheduleRemoteReadProgressSave(keys: string[]) {
+  if (!remoteReadProgressEnabled) return;
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = setTimeout(() => {
+    void pushReadProgressToApi(keys);
+  }, 400);
+}
+
+async function performReadProgressSync(): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    const { synced, keys } = await fetchReadProgressFromApi();
+    if (!synced) {
+      remoteReadProgressEnabled = false;
+      return;
+    }
+    remoteReadProgressEnabled = true;
+    const local = loadReadArray();
+    if (keys.length === 0 && local.length > 0) {
+      await pushReadProgressToApi(local);
+      return;
+    }
+    saveReadArray(keys, { skipRemote: true });
+  } catch {
+    remoteReadProgressEnabled = false;
+  }
+}
+
+/**
+ * When Redis is configured on the server, loads or migrates read progress once per page session.
+ * Call from client components that depend on read state (e.g. in useEffect).
+ */
+export function initReadProgressSync(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (!readProgressSyncPromise) {
+    readProgressSyncPromise = performReadProgressSync();
+  }
+  return readProgressSyncPromise;
+}
+
 function dispatchNotesChanged() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent("biblio-notes-changed"));
@@ -57,9 +142,16 @@ function loadReadArray(): string[] {
   }
 }
 
-function saveReadArray(keys: string[]) {
-  localStorage.setItem(READ_KEY, JSON.stringify([...new Set(keys)].sort()));
+function saveReadArray(
+  keys: string[],
+  opts?: { skipRemote?: boolean },
+) {
+  const sorted = [...new Set(keys)].sort();
+  localStorage.setItem(READ_KEY, JSON.stringify(sorted));
   dispatchReadChanged();
+  if (!opts?.skipRemote) {
+    scheduleRemoteReadProgressSave(sorted);
+  }
 }
 
 export function getReadChapterKeys(): string[] {

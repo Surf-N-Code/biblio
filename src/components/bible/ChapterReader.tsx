@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BookOpenText, Orbit, Zap } from "lucide-react";
 import { Drawer } from "vaul";
 import { AiMarkdownModal } from "@/components/bible/AiMarkdownModal";
 import { cn } from "@/lib/utils/cn";
@@ -107,37 +108,7 @@ function IconLanguageDe(props: { className?: string }) {
   );
 }
 
-function IconBoltBrief(props: { className?: string }) {
-  return (
-    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"
-      />
-    </svg>
-  );
-}
-
-function IconBookLong(props: { className?: string }) {
-  return (
-    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v15.128A9.114 9.114 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 0-6-2.292c-1.052 0-2.062.18-3 .512v15.128a8.966 8.966 0 0 0 6 2.292m0-14.25v14.25"
-      />
-    </svg>
-  );
-}
-
-function IconContext(props: { className?: string }) {
-  return (
-    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-      <circle cx="12" cy="12" r="8.25" />
-    </svg>
-  );
-}
+const kiIconClass = "h-4 w-4 shrink-0 stroke-[1.5]";
 
 const toolbarIconBtnClass =
   "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-800 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900";
@@ -601,7 +572,7 @@ export function ChapterReader({
                 {aiLoading === "explain-brief" ? (
                   <span className="text-sm font-semibold">…</span>
                 ) : (
-                  <IconBoltBrief className="h-4 w-4 shrink-0" />
+                  <Zap className={kiIconClass} aria-hidden />
                 )}
               </button>
               <button
@@ -615,7 +586,7 @@ export function ChapterReader({
                 {aiLoading === "explain-long" ? (
                   <span className="text-sm font-semibold">…</span>
                 ) : (
-                  <IconBookLong className="h-4 w-4 shrink-0" />
+                  <BookOpenText className={kiIconClass} aria-hidden />
                 )}
               </button>
               <button
@@ -629,7 +600,7 @@ export function ChapterReader({
                 {aiLoading === "context" ? (
                   <span className="text-sm font-semibold">…</span>
                 ) : (
-                  <IconContext className="h-4 w-4 shrink-0" />
+                  <Orbit className={kiIconClass} aria-hidden />
                 )}
               </button>
             </div>

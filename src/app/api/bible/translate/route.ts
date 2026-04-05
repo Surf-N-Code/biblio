@@ -3,12 +3,16 @@ import {
   getOpenRouter,
   OPENROUTER_MODEL_QUICK,
 } from "@/lib/ai/openrouter-client";
+import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
 type Body = { text: string };
 
 export async function POST(request: Request) {
+  const denied = await requireSession();
+  if (denied) return denied;
+
   let body: Body;
   try {
     body = (await request.json()) as Body;

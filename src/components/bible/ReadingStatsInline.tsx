@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   getReadingStats,
+  initReadProgressSync,
   TOTAL_BIBLE_CHAPTERS,
 } from "@/lib/bible/reading-storage";
 
@@ -16,7 +17,7 @@ export function ReadingStatsInline() {
 
   useEffect(() => {
     const sync = () => setStats(getReadingStats());
-    sync();
+    void initReadProgressSync().then(sync);
     window.addEventListener("biblio-read-changed", sync);
     return () => window.removeEventListener("biblio-read-changed", sync);
   }, []);

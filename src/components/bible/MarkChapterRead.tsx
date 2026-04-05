@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  initReadProgressSync,
   isChapterRead,
   toggleChapterRead,
 } from "@/lib/bible/reading-storage";
@@ -16,7 +17,7 @@ export function MarkChapterRead({ usfm, chapter }: MarkChapterReadProps) {
 
   useEffect(() => {
     const sync = () => setRead(isChapterRead(usfm, chapter));
-    sync();
+    void initReadProgressSync().then(sync);
     window.addEventListener("biblio-read-changed", sync);
     return () => window.removeEventListener("biblio-read-changed", sync);
   }, [usfm, chapter]);

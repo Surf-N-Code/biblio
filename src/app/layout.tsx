@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AuthUserBar } from "@/components/auth/AuthUserBar";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import "./globals.css";
@@ -40,7 +41,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          <div className="pointer-events-none fixed right-0 top-0 z-50 flex justify-end p-3">
+          <div className="pointer-events-none fixed right-0 top-0 z-50 flex justify-end gap-2 p-3">
+            <div className="pointer-events-auto flex items-start gap-2 pt-0.5">
+              <AuthUserBar />
+            </div>
             <div className="pointer-events-auto">
               <ThemeToggle />
             </div>
