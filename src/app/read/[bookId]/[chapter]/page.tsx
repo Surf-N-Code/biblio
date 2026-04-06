@@ -8,7 +8,7 @@ import { MarkChapterRead } from "@/components/bible/MarkChapterRead";
 import { ReadSubNav } from "@/components/bible/ReadSubNav";
 import { getBookBySlug } from "@/lib/bible/canonical-books";
 import { loadAmplifiedChapter, loadPrimaryChapter } from "@/lib/bible/api";
-import { getPreviousChaptersContext } from "@/lib/ai/prev-summary";
+import { PreviousChapterContextPanel } from "@/components/bible/PreviousChapterContextPanel";
 import { matthewHenryFileExists } from "@/lib/commentary/matthew-henry";
 
 type PageProps = {
@@ -44,10 +44,9 @@ export default async function ReadChapterPage({ params }: PageProps) {
     notFound();
   }
 
-  const [primary, amplified, prevSummary] = await Promise.all([
+  const [primary, amplified] = await Promise.all([
     loadPrimaryChapter(book.usfm, book.slug, chapter),
     loadAmplifiedChapter(book.usfm, chapter),
-    getPreviousChaptersContext(book.usfm, book.slug, chapter),
   ]);
 
   const hasMh = matthewHenryFileExists(book.usfm, chapter);
@@ -98,14 +97,14 @@ export default async function ReadChapterPage({ params }: PageProps) {
           chapter={chapter}
           maxChapter={book.chapters}
         >
-          {prevSummary && (
-            <aside className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-200">
-              <h2 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-                Kontext aus vorherigen Kapiteln
-              </h2>
-              <p className="mt-2 whitespace-pre-wrap">{prevSummary}</p>
-            </aside>
-          )}
+          {chapter > 1 ? (
+            <PreviousChapterContextPanel
+              key={`${book.usfm}-${chapter}`}
+              usfm={book.usfm}
+              bookSlug={book.slug}
+              chapter={chapter}
+            />
+          ) : null}
 
           <div className="mt-8">
             <ChapterReader

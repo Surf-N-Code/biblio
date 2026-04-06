@@ -17,11 +17,15 @@ export async function getPreviousChaptersContext(
 
   const storage = getPrevChapterSummaryStorage();
   const key = joinKeys(PROMPT_VERSION, usfm, slug, String(chapter));
-  if (await storage.hasItem(key)) {
-    const cached = await storage.getItem(key);
-    if (typeof cached === "string" && cached.length > 0) {
-      return cached;
+  try {
+    if (await storage.hasItem(key)) {
+      const cached = await storage.getItem(key);
+      if (typeof cached === "string" && cached.length > 0) {
+        return cached;
+      }
     }
+  } catch {
+    /* Redis unreachable or cache error — generate without cache */
   }
 
   const prev = chapter - 1;

@@ -14,7 +14,11 @@ export function getBiblioRedisUrl(): string | undefined {
  * Upstash requires TLS. `redis-cli --tls` with `redis://` maps to `rediss://` for ioredis.
  */
 export function redisUrlWithTls(url: string): string {
-  const trimmed = url.trim();
+  let trimmed = url.trim();
+  // Common copy-paste typo (double "r" in scheme)
+  if (trimmed.startsWith("rredis://")) {
+    trimmed = `redis://${trimmed.slice("rredis://".length)}`;
+  }
   if (
     trimmed.startsWith("redis://") &&
     !trimmed.startsWith("rediss://") &&
