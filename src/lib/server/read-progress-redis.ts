@@ -11,7 +11,13 @@ export async function redisGetReadProgressKeys(
 ): Promise<string[] | null> {
   const r = getRedis();
   if (!r) return null;
-  const raw = await r.get(PREFIX + readerId);
+  let raw: string | null;
+  try {
+    raw = await r.get(PREFIX + readerId);
+  } catch (error) {
+    console.error("[read-progress] Redis read failed", error);
+    return [];
+  }
   if (raw == null || raw === "") return [];
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -27,7 +33,11 @@ export async function redisSetReadProgressKeys(
   keys: string[],
 ): Promise<void> {
   const r = getRedis();
-  if (!r) throw new Error("Redis not configured");
+  if (!r) return;
   const unique = [...new Set(keys)].sort();
-  await r.set(PREFIX + readerId, JSON.stringify(unique));
+  try {
+    await r.set(PREFIX + readerId, JSON.stringify(unique));
+  } catch (error) {
+    console.error("[read-progress] Redis write failed", error);
+  }
 }
