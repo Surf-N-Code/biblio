@@ -1,7 +1,7 @@
 import { CANONICAL_BOOKS } from "./canonical-books";
 
 const READ_KEY = "biblio-read-chapters";
-const READER_ID_KEY = "biblio-reader-id";
+const READ_PROGRESS_OWNER_KEY = "biblio-read-progress-owner";
 const NOTES_KEY = "biblio-verse-notes";
 const MAX_NOTES = 2000;
 
@@ -44,42 +44,47 @@ function dispatchReadChanged() {
   window.dispatchEvent(new CustomEvent("biblio-read-changed"));
 }
 
-export function getOrCreateReaderId(): string {
+function loadReadProgressOwner(): string {
   if (typeof window === "undefined") return "";
-  let id = localStorage.getItem(READER_ID_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem(READER_ID_KEY, id);
+  try {
+    return localStorage.getItem(READ_PROGRESS_OWNER_KEY)?.trim() ?? "";
+  } catch {
+    return "";
   }
-  return id;
+}
+
+function saveReadProgressOwner(username: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(READ_PROGRESS_OWNER_KEY, username);
 }
 
 async function fetchReadProgressFromApi(): Promise<{
   synced: boolean;
   keys: string[];
+  username?: string;
 }> {
-  const id = getOrCreateReaderId();
-  if (!id) return { synced: false, keys: [] };
   const res = await fetch("/api/bible/read-progress", {
-    headers: { "X-Biblio-Reader-Id": id },
+    credentials: "include",
     cache: "no-store",
   });
   if (!res.ok) return { synced: false, keys: [] };
-  return res.json() as Promise<{ synced: boolean; keys: string[] }>;
+  return res.json() as Promise<{
+    synced: boolean;
+    keys: string[];
+    username?: string;
+  }>;
 }
 
 async function pushReadProgressToApi(keys: string[]): Promise<void> {
   if (!remoteReadProgressEnabled) return;
-  const id = getOrCreateReaderId();
-  if (!id) return;
   const unique = [...new Set(keys)].sort();
   await fetch("/api/bible/read-progress", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      "X-Biblio-Reader-Id": id,
     },
     body: JSON.stringify({ keys: unique }),
+    credentials: "include",
     cache: "no-store",
   });
 }
@@ -95,18 +100,30 @@ function scheduleRemoteReadProgressSave(keys: string[]) {
 async function performReadProgressSync(): Promise<void> {
   if (typeof window === "undefined") return;
   try {
-    const { synced, keys } = await fetchReadProgressFromApi();
+    const { synced, keys, username } = await fetchReadProgressFromApi();
     if (!synced) {
       remoteReadProgressEnabled = false;
       return;
     }
     remoteReadProgressEnabled = true;
     const local = loadReadArray();
+    const storedOwner = loadReadProgressOwner();
+    const accountSwitch =
+      storedOwner !== "" && username !== undefined && storedOwner !== username;
+
+    if (accountSwitch) {
+      saveReadArray(keys, { skipRemote: true });
+      if (username !== undefined) saveReadProgressOwner(username);
+      return;
+    }
+
     if (keys.length === 0 && local.length > 0) {
       await pushReadProgressToApi(local);
+      if (username !== undefined) saveReadProgressOwner(username);
       return;
     }
     saveReadArray(keys, { skipRemote: true });
+    if (username !== undefined) saveReadProgressOwner(username);
   } catch {
     remoteReadProgressEnabled = false;
   }

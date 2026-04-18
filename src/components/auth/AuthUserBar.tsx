@@ -1,36 +1,10 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { logout } from "@/app/actions/auth";
+import { getSession } from "@/lib/auth/session";
 
-type MeResponse = { user: { username: string } | null };
+export async function AuthUserBar() {
+  const session = await getSession();
 
-export function AuthUserBar() {
-  const [user, setUser] = useState<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/auth/me", { cache: "no-store" });
-        const data = (await res.json()) as MeResponse;
-        if (!cancelled) {
-          setUser(data.user?.username ?? null);
-        }
-      } catch {
-        if (!cancelled) setUser(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (user === undefined) {
-    return null;
-  }
-
-  if (user === null) {
+  if (!session) {
     return (
       <a
         href="/login"
@@ -41,11 +15,13 @@ export function AuthUserBar() {
     );
   }
 
+  const { username } = session;
+
   return (
     <div className="flex max-w-[min(100vw-6rem,14rem)] flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
-      <span className="truncate text-xs text-zinc-600 dark:text-zinc-400" title={user}>
+      <span className="truncate text-xs text-zinc-600 dark:text-zinc-400" title={username}>
         <span className="hidden sm:inline">Angemeldet als </span>
-        <strong className="text-zinc-900 dark:text-zinc-100">{user}</strong>
+        <strong className="text-zinc-900 dark:text-zinc-100">{username}</strong>
       </span>
       <form action={logout}>
         <button

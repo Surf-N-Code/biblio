@@ -34,7 +34,8 @@ export function isAuthStorageAvailable(): boolean {
   return Boolean(getBiblioRedisUrl());
 }
 
-function normalizeUsernameKey(username: string): string {
+/** Same normalization as Redis user keys and unstorage user item keys. */
+export function normalizeUsernameKey(username: string): string {
   return username.trim().toLowerCase();
 }
 
@@ -62,27 +63,37 @@ export async function verifyPassword(
   }
 }
 
+function parseStoredUser(raw: unknown): StoredUser | null {
+  const parsed =
+    typeof raw === "string"
+      ? (() => {
+          try {
+            return JSON.parse(raw) as unknown;
+          } catch {
+            return null;
+          }
+        })()
+      : raw;
+
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    typeof (parsed as StoredUser).username !== "string" ||
+    typeof (parsed as StoredUser).passwordHash !== "string" ||
+    typeof (parsed as StoredUser).createdAt !== "number"
+  ) {
+    return null;
+  }
+
+  return parsed as StoredUser;
+}
+
 export async function getUser(username: string): Promise<StoredUser | null> {
   const st = getUserStorage();
   if (!st) return null;
   const key = normalizeUsernameKey(username);
   const raw = await st.getItem(key);
-  if (typeof raw !== "string") return null;
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      typeof (parsed as StoredUser).username !== "string" ||
-      typeof (parsed as StoredUser).passwordHash !== "string" ||
-      typeof (parsed as StoredUser).createdAt !== "number"
-    ) {
-      return null;
-    }
-    return parsed as StoredUser;
-  } catch {
-    return null;
-  }
+  return parseStoredUser(raw);
 }
 
 export type CreateUserResult =
@@ -108,6 +119,6 @@ export async function createUser(
     passwordHash,
     createdAt: Date.now(),
   };
-  await st.setItem(key, JSON.stringify(record));
+  await st.setItem(key, record);
   return { ok: true };
 }

@@ -1,19 +1,20 @@
 import { getRedis } from "@/lib/redis/client";
 
-const PREFIX = "biblio:read-progress:";
+/** `normalizeUsernameKey(session.username)` — distinct from legacy `biblio:read-progress:{uuid}`. */
+const PREFIX = "biblio:read-progress:user:";
 
 export function isReadProgressRedisEnabled(): boolean {
   return getRedis() !== undefined;
 }
 
 export async function redisGetReadProgressKeys(
-  readerId: string,
+  normalizedUsername: string,
 ): Promise<string[] | null> {
   const r = getRedis();
   if (!r) return null;
   let raw: string | null;
   try {
-    raw = await r.get(PREFIX + readerId);
+    raw = await r.get(PREFIX + normalizedUsername);
   } catch (error) {
     console.error("[read-progress] Redis read failed", error);
     return [];
@@ -29,14 +30,14 @@ export async function redisGetReadProgressKeys(
 }
 
 export async function redisSetReadProgressKeys(
-  readerId: string,
+  normalizedUsername: string,
   keys: string[],
 ): Promise<void> {
   const r = getRedis();
   if (!r) return;
   const unique = [...new Set(keys)].sort();
   try {
-    await r.set(PREFIX + readerId, JSON.stringify(unique));
+    await r.set(PREFIX + normalizedUsername, JSON.stringify(unique));
   } catch (error) {
     console.error("[read-progress] Redis write failed", error);
   }

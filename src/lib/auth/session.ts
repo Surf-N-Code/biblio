@@ -40,6 +40,30 @@ function newSessionToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+function parseSessionPayload(raw: unknown): SessionPayload | null {
+  const parsed =
+    typeof raw === "string"
+      ? (() => {
+          try {
+            return JSON.parse(raw) as unknown;
+          } catch {
+            return null;
+          }
+        })()
+      : raw;
+
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    typeof (parsed as SessionPayload).username !== "string" ||
+    typeof (parsed as SessionPayload).createdAt !== "number"
+  ) {
+    return null;
+  }
+
+  return parsed as SessionPayload;
+}
+
 export async function createSession(username: string): Promise<void> {
   const st = getSessionStorage();
   if (!st) throw new Error("Redis not configured for sessions");
@@ -49,7 +73,7 @@ export async function createSession(username: string): Promise<void> {
     username,
     createdAt: Date.now(),
   };
-  await st.setItem(token, JSON.stringify(payload), {
+  await st.setItem(token, payload, {
     ttl: SESSION_TTL_SECONDS,
   });
 
@@ -72,21 +96,7 @@ async function loadSessionByToken(
   const st = getSessionStorage();
   if (!st) return null;
   const raw = await st.getItem(token);
-  if (typeof raw !== "string") return null;
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      typeof (parsed as SessionPayload).username !== "string" ||
-      typeof (parsed as SessionPayload).createdAt !== "number"
-    ) {
-      return null;
-    }
-    return parsed as SessionPayload;
-  } catch {
-    return null;
-  }
+  return parseSessionPayload(raw);
 }
 
 export async function getSession(): Promise<SessionPayload | null> {

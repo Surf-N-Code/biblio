@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/auth/session";
+import { normalizeUsernameKey } from "@/lib/auth/users";
+import { getSession } from "@/lib/auth/session";
 import {
   isReadProgressRedisEnabled,
   redisGetReadProgressKeys,
@@ -8,17 +9,8 @@ import {
 
 export const runtime = "nodejs";
 
-const READER_ID_HEADER = "x-biblio-reader-id";
-
 const MAX_KEYS = 1500;
 const MAX_KEY_LEN = 80;
-
-function parseReaderId(request: Request): string | null {
-  const raw = request.headers.get(READER_ID_HEADER)?.trim();
-  if (!raw || raw.length < 8 || raw.length > 200) return null;
-  if (!/^[a-zA-Z0-9-]+$/.test(raw)) return null;
-  return raw;
-}
 
 function normalizeKeys(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
@@ -32,34 +24,32 @@ function normalizeKeys(raw: unknown): string[] | null {
   return [...new Set(out)].sort();
 }
 
-export async function GET(request: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+export async function GET() {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const username = normalizeUsernameKey(session.username);
 
   if (!isReadProgressRedisEnabled()) {
     return NextResponse.json({ synced: false, keys: [] as string[] });
   }
-  const readerId = parseReaderId(request);
-  if (!readerId) {
-    return NextResponse.json({ error: "Missing or invalid X-Biblio-Reader-Id" }, { status: 400 });
-  }
-  const keys = await redisGetReadProgressKeys(readerId);
+  const keys = await redisGetReadProgressKeys(username);
   if (keys === null) {
     return NextResponse.json({ synced: false, keys: [] as string[] });
   }
-  return NextResponse.json({ synced: true, keys });
+  return NextResponse.json({ synced: true, keys, username });
 }
 
 export async function PUT(request: Request) {
-  const denied = await requireSession();
-  if (denied) return denied;
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const username = normalizeUsernameKey(session.username);
 
   if (!isReadProgressRedisEnabled()) {
     return NextResponse.json({ error: "Redis not configured" }, { status: 503 });
-  }
-  const readerId = parseReaderId(request);
-  if (!readerId) {
-    return NextResponse.json({ error: "Missing or invalid X-Biblio-Reader-Id" }, { status: 400 });
   }
   let body: unknown;
   try {
@@ -75,7 +65,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Invalid keys array" }, { status: 400 });
   }
   try {
-    await redisSetReadProgressKeys(readerId, keys);
+    await redisSetReadProgressKeys(username, keys);
   } catch {
     return NextResponse.json({ error: "Failed to save" }, { status: 500 });
   }
