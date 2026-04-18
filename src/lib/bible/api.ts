@@ -6,10 +6,12 @@ import {
   SCRIPTURE_BASE,
 } from "./config";
 import { chapterId } from "./canonical-books";
+import { getDefaultGermanBibleFile, getGermanChapterVerses } from "./de-local";
 import { parseChapterHtmlToVerses, type ParsedVerse } from "./parse-chapter-html";
 import { getChapterFromLocalNlt, hasLocalNltFile } from "./nlt-local";
+import type { BibleReadLang } from "./read-language";
 
-export type ChapterSource = "local-nlt" | "api-bible" | "bible-api-com";
+export type ChapterSource = "local-nlt" | "api-bible" | "bible-api-com" | "local-de";
 
 export type LoadedChapter = {
   verses: ParsedVerse[];
@@ -79,6 +81,35 @@ async function fetchApiBibleChapterVerses(
   throw new Error("API.Bible: could not parse chapter into verses");
 }
 
+/**
+ * Loads the main column for the reader: English (existing pipeline) or German (local `data/bibles`).
+ */
+export async function loadReadChapter(
+  usfm: string,
+  slug: string,
+  chapter: number,
+  lang: BibleReadLang,
+): Promise<LoadedChapter> {
+  if (lang === "de") {
+    const file = getDefaultGermanBibleFile();
+    const verses = getGermanChapterVerses(file, usfm, chapter);
+    if (verses?.length) {
+      const label = file.replace(/\.txt$/i, "");
+      return {
+        verses,
+        source: "local-de",
+        bibleLabel: `Deutsch (${label})`,
+      };
+    }
+    const fallback = await loadPrimaryChapter(usfm, slug, chapter);
+    return {
+      ...fallback,
+      bibleLabel: `${fallback.bibleLabel} — deutsche Datei fehlt, Fallback`,
+    };
+  }
+  return loadPrimaryChapter(usfm, slug, chapter);
+}
+
 export async function loadPrimaryChapter(
   usfm: string,
   slug: string,
@@ -125,7 +156,8 @@ export async function loadChapterPlainText(
   usfm: string,
   slug: string,
   chapter: number,
+  lang: BibleReadLang = "en",
 ): Promise<string> {
-  const { verses } = await loadPrimaryChapter(usfm, slug, chapter);
+  const { verses } = await loadReadChapter(usfm, slug, chapter, lang);
   return verses.map((v) => `${v.verse} ${v.text}`).join("\n");
 }

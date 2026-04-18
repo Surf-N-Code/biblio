@@ -7,7 +7,9 @@ import { ChapterSwipeNav } from "@/components/bible/ChapterSwipeNav";
 import { MarkChapterRead } from "@/components/bible/MarkChapterRead";
 import { ReadSubNav } from "@/components/bible/ReadSubNav";
 import { getBookBySlug } from "@/lib/bible/canonical-books";
-import { loadAmplifiedChapter, loadPrimaryChapter } from "@/lib/bible/api";
+import { loadAmplifiedChapter, loadReadChapter } from "@/lib/bible/api";
+import { getDefaultGermanBibleFile } from "@/lib/bible/de-local";
+import { getBibleReadLangFromCookies } from "@/lib/bible/read-language-server";
 import { PreviousChapterContextPanel } from "@/components/bible/PreviousChapterContextPanel";
 import { matthewHenryFileExists } from "@/lib/commentary/matthew-henry";
 
@@ -44,9 +46,10 @@ export default async function ReadChapterPage({ params }: PageProps) {
     notFound();
   }
 
+  const bibleLang = await getBibleReadLangFromCookies();
   const [primary, amplified] = await Promise.all([
-    loadPrimaryChapter(book.usfm, book.slug, chapter),
-    loadAmplifiedChapter(book.usfm, chapter),
+    loadReadChapter(book.usfm, book.slug, chapter, bibleLang),
+    bibleLang === "de" ? Promise.resolve(null) : loadAmplifiedChapter(book.usfm, chapter),
   ]);
 
   const hasMh = matthewHenryFileExists(book.usfm, chapter);
@@ -67,7 +70,7 @@ export default async function ReadChapterPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <article className="mx-auto max-w-5xl px-4 py-8">
-        <ReadSubNav />
+        <ReadSubNav bibleLang={bibleLang} />
         <nav className="mb-6 text-sm text-zinc-600 dark:text-zinc-400" aria-label="Brotkrumen">
           <Link href="/read" className="underline underline-offset-2">
             Lesen
@@ -116,6 +119,8 @@ export default async function ReadChapterPage({ params }: PageProps) {
               amplified={amplified}
               storageKey={storageKey}
               hasMatthewHenry={hasMh}
+              bibleLang={bibleLang}
+              germanToolFile={getDefaultGermanBibleFile()}
             />
           </div>
 

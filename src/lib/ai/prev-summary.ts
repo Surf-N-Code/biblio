@@ -1,5 +1,8 @@
+import "server-only";
+
 import { joinKeys } from "unstorage";
 import { loadChapterPlainText } from "@/lib/bible/api";
+import type { BibleReadLang } from "@/lib/bible/read-language";
 import {
   getOpenRouter,
   OPENROUTER_MODEL_QUICK,
@@ -12,11 +15,12 @@ export async function getPreviousChaptersContext(
   usfm: string,
   slug: string,
   chapter: number,
+  lang: BibleReadLang = "en",
 ): Promise<string | null> {
   if (chapter <= 1) return null;
 
   const storage = getPrevChapterSummaryStorage();
-  const key = joinKeys(PROMPT_VERSION, usfm, slug, String(chapter));
+  const key = joinKeys(PROMPT_VERSION, lang, usfm, slug, String(chapter));
   try {
     if (await storage.hasItem(key)) {
       const cached = await storage.getItem(key);
@@ -31,7 +35,7 @@ export async function getPreviousChaptersContext(
   const prev = chapter - 1;
   let text: string;
   try {
-    text = await loadChapterPlainText(usfm, slug, prev);
+    text = await loadChapterPlainText(usfm, slug, prev, lang);
   } catch {
     return "Kontext konnte nicht geladen werden.";
   }

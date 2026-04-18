@@ -10,6 +10,7 @@ import {
   addVerseNote,
   type VerseNoteAiKind,
 } from "@/lib/bible/reading-storage";
+import type { BibleReadLang } from "@/lib/bible/read-language";
 
 const HIGHLIGHT_PRESETS = [
   { id: "yellow", label: "Gelb", className: "bg-amber-200/90 dark:bg-amber-900/50" },
@@ -77,9 +78,6 @@ function saveSnippets(items: Snippet[]) {
   localStorage.setItem("biblio-snippets", JSON.stringify(items.slice(0, 200)));
 }
 
-/** Default German text file in `data/bibles` (Luther 1912). */
-const DEFAULT_GERMAN_BIBLE_FILE = "de_luther1912.txt";
-
 function IconCopy(props: { className?: string }) {
   return (
     <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
@@ -127,6 +125,10 @@ export type ChapterReaderProps = {
   storageKey: string;
   /** Local Matthew Henry HTML pack available for this book+chapter */
   hasMatthewHenry: boolean;
+  /** Main column language; German tools compare only when primary is English. */
+  bibleLang?: BibleReadLang;
+  /** `de_*.txt` basename for the „Deutsch anzeigen“ tool (matches server default). */
+  germanToolFile?: string;
 };
 
 export function ChapterReader({
@@ -138,6 +140,8 @@ export function ChapterReader({
   amplified,
   storageKey,
   hasMatthewHenry,
+  bibleLang = "en",
+  germanToolFile = "de_luther1912.txt",
 }: ChapterReaderProps) {
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [highlights, setHighlights] = useState<HighlightMap>({});
@@ -268,7 +272,7 @@ export function ChapterReader({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          file: DEFAULT_GERMAN_BIBLE_FILE,
+          file: germanToolFile,
           usfm,
           chapter,
           verses: selectedVersesKey,
@@ -543,20 +547,22 @@ export function ChapterReader({
                 >
                   <IconBookmarkSave className="h-[1.125rem] w-[1.125rem]" />
                 </button>
-                <button
-                  type="button"
-                  onClick={runGermanPassage}
-                  disabled={!!aiLoading}
-                  className={toolbarIconBtnClass}
-                  aria-label="Ausgewählte Verse in deutscher Bibel (Luther 1912) anzeigen"
-                  title="Deutsch · Luther 1912"
-                >
-                  {aiLoading === "german" ? (
-                    <span className="text-xs font-semibold tabular-nums">…</span>
-                  ) : (
-                    <IconLanguageDe className="h-[1.125rem] w-[1.125rem]" />
-                  )}
-                </button>
+                {bibleLang === "en" ? (
+                  <button
+                    type="button"
+                    onClick={runGermanPassage}
+                    disabled={!!aiLoading}
+                    className={toolbarIconBtnClass}
+                    aria-label="Ausgewählte Verse in deutscher Bibel anzeigen"
+                    title={`Deutsch · ${germanToolFile.replace(/\.txt$/i, "")}`}
+                  >
+                    {aiLoading === "german" ? (
+                      <span className="text-xs font-semibold tabular-nums">…</span>
+                    ) : (
+                      <IconLanguageDe className="h-[1.125rem] w-[1.125rem]" />
+                    )}
+                  </button>
+                ) : null}
               </div>
             </div>
 

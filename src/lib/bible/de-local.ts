@@ -42,6 +42,12 @@ export function listGermanBibleFiles(): string[] {
   });
 }
 
+/** Preferred `de_*.txt` for reading tools (Luther 1912 first when present). */
+export function getDefaultGermanBibleFile(): string {
+  const listed = listGermanBibleFiles();
+  return listed[0] ?? "de_luther1912.txt";
+}
+
 function unboundCodeToUsfm(code: string): string | undefined {
   const m = UNBOUND_BOOK.exec(code.trim());
   if (!m) return undefined;
