@@ -128,7 +128,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
     >
       <div
         className={cn(
-          "flex max-h-[min(90vh,56rem)] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl",
+          "grid w-full min-w-0 max-h-[min(100dvh-1.5rem,56rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl",
           "dark:border-zinc-700 dark:bg-zinc-950",
         )}
       >
@@ -144,7 +144,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
             Schließen
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch]">
           {markdown?.trim() ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {markdown}
