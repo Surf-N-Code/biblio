@@ -119,7 +119,9 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
     <dialog
       ref={dialogRef}
       className={cn(
-        "fixed inset-0 z-100 m-0 flex w-full max-w-none items-center justify-center border-0 bg-transparent p-3 outline-none backdrop:bg-black/50",
+        "fixed inset-0 z-100 m-0 hidden w-full max-w-none border-0 bg-transparent p-3 outline-none backdrop:bg-black/50",
+        /* UA `dialog:not([open]) { display:none }` loses to Tailwind `flex`; hide until `[open]` from showModal() */
+        "open:flex open:items-center open:justify-center",
       )}
       aria-labelledby={titleId}
       aria-modal="true"
