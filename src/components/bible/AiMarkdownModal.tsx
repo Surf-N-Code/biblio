@@ -119,8 +119,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
     <dialog
       ref={dialogRef}
       className={cn(
-        "fixed left-1/2 top-1/2 z-100 w-[min(100vw-1.5rem,40rem)] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 -translate-y-1/2",
-        "border-0 bg-transparent p-0 outline-none backdrop:bg-black/50",
+        "fixed inset-0 z-100 m-0 flex w-full max-w-none items-center justify-center border-0 bg-transparent p-3 outline-none backdrop:bg-black/50",
       )}
       aria-labelledby={titleId}
       aria-modal="true"
@@ -128,7 +127,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
     >
       <div
         className={cn(
-          "grid w-full min-w-0 max-h-[min(100dvh-1.5rem,56rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl",
+          "flex max-h-[min(100dvh-1.5rem,56rem)] w-full min-w-0 max-w-160 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl",
           "dark:border-zinc-700 dark:bg-zinc-950",
         )}
       >
@@ -144,7 +143,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
             Schließen
           </button>
         </header>
-        <div className="min-h-0 min-w-0 overflow-y-auto overscroll-contain px-4 py-4 [-webkit-overflow-scrolling:touch]">
+        <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch]">
           {markdown?.trim() ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {markdown}
