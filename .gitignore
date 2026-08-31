@@ -87,3 +87,8 @@ next-env.d.ts
 /actionlint
 
 config.bat
+
+# Umgebungsvariablen, nicht einchecken
+.env
+.env.local
+.env.*.local
