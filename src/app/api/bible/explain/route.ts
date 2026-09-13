@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  getOpenRouter,
-  OPENROUTER_MODEL_COMPLEX,
-  OPENROUTER_MODEL_QUICK,
-} from "@/lib/ai/openrouter-client";
+import { getOpenAI, getOpenAIModelQuick, getOpenAIModelComplex } from "@/lib/ai/openai-client";
 import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -31,10 +27,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid passage" }, { status: 400 });
   }
 
-  const client = getOpenRouter();
+  const client = getOpenAI();
   if (!client) {
     return NextResponse.json(
-      { error: "OPENROUTER_API_KEY is not configured" },
+      { error: "OPENAI_API_KEY is not configured" },
       { status: 503 },
     );
   }
@@ -45,7 +41,7 @@ export async function POST(request: Request) {
       : "Erkläre ausführlich auf Deutsch (du-Form) mit Absätzen: Hintergrund, Bedeutung im Kontext, mögliche Anwendung — sachlich und ohne Dogma.";
 
   const model =
-    detail === "brief" ? OPENROUTER_MODEL_QUICK : OPENROUTER_MODEL_COMPLEX;
+    detail === "brief" ? getOpenAIModelQuick() : getOpenAIModelComplex();
 
   const completion = await client.chat.completions.create({
     model,

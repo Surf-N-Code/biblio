@@ -38,8 +38,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ## Login and chapter context configuration
 
 - `BIBLIO_REDIS_URL` stores accounts, sessions, reading progress, and cached chapter summaries. `PREV_SUMMARY_REDIS_URL` remains a fallback. Existing accounts require access to the original database.
-- `OPENAI_API_KEY` enables previous-chapter summaries directly through OpenAI. Optional `OPENAI_MODEL_QUICK` defaults to `gpt-4o`.
-- If `OPENAI_API_KEY` is absent, summaries use `OPENROUTER_API_KEY` and `OPENROUTER_MODEL_QUICK` as before. Other AI tools still use OpenRouter. OpenAI and OpenRouter credentials are not interchangeable.
+- `OPENAI_API_KEY` enables all AI tools: explanations, passage context, previous-chapter summaries, and the German translation fallback when DeepL is not configured. Optional `OPENAI_MODEL_QUICK` defaults to `gpt-4o`; `OPENAI_MODEL_COMPLEX` defaults to `gpt-4.1` for extensive explanations.
+- `DEEPL_API_KEY`, when set, remains the primary provider for German translation.
 
 Configure these in `.env.local` for local development and in the appropriate Vercel environment for deployment. Redeploy after changing Vercel environment variables. Never commit keys.
 

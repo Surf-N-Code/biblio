@@ -1,0 +1,82 @@
+import { beforeEach, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ options: vi.fn(), create: vi.fn() }));
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/auth/session", () => ({ requireSession: async () => null }));
+vi.mock("openai", () => ({
+  default: class {
+    constructor(options: unknown) { mocks.options(options); }
+    chat = { completions: { create: mocks.create } };
+  },
+}));
+
+import { POST as explain } from "@/app/api/bible/explain/route";
+import { POST as context } from "@/app/api/bible/context/route";
+import { POST as translate } from "@/app/api/bible/translate/route";
+
+function request(path: string, body: object) {
+  return new Request(`http://localhost/api/bible/${path}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
+  vi.stubEnv("DEEPL_API_KEY", "");
+  vi.stubEnv("OPENAI_MODEL_QUICK", "");
+  vi.stubEnv("OPENAI_MODEL_COMPLEX", "");
+  mocks.create.mockResolvedValue({ choices: [{ message: { content: "Generated answer" } }] });
+});
+
+it("uses the OpenAI key for brief and extensive explanations", async () => {
+  for (const detail of ["brief", "extensive"] as const) {
+    const response = await explain(request("explain", { reference: "Genesis 1:1", passage: "In the beginning", detail }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ text: "Generated answer" });
+  }
+  expect(mocks.options).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "test-openai-key", baseURL: "https://api.openai.com/v1" }));
+  expect(mocks.create).toHaveBeenNthCalledWith(1, expect.objectContaining({ model: "gpt-4o" }));
+  expect(mocks.create).toHaveBeenNthCalledWith(2, expect.objectContaining({ model: "gpt-4.1" }));
+});
+
+it("uses the OpenAI key for verse context", async () => {
+  const response = await context(request("context", { reference: "Genesis 1:1", passage: "In the beginning" }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ text: "Generated answer" });
+  expect(mocks.options).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "test-openai-key", baseURL: "https://api.openai.com/v1" }));
+  expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4o" }));
+});
+
+it("uses OpenAI for German translation when DeepL is absent", async () => {
+  const response = await translate(request("translate", { text: "In the beginning" }));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ text: "Generated answer", provider: "openai" });
+  expect(mocks.options).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "test-openai-key", baseURL: "https://api.openai.com/v1" }));
+});
+
+it("allows model overrides without changing providers", async () => {
+  vi.stubEnv("OPENAI_MODEL_QUICK", "my-quick-model");
+  vi.stubEnv("OPENAI_MODEL_COMPLEX", "my-complex-model");
+  await context(request("context", { reference: "Genesis 1:1", passage: "In the beginning" }));
+  await explain(request("explain", { reference: "Genesis 1:1", passage: "In the beginning", detail: "extensive" }));
+  expect(mocks.create).toHaveBeenNthCalledWith(1, expect.objectContaining({ model: "my-quick-model" }));
+  expect(mocks.create).toHaveBeenNthCalledWith(2, expect.objectContaining({ model: "my-complex-model" }));
+});
+
+it("names the OpenAI key when AI tools have no configured provider", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+
+  const responses = await Promise.all([
+    explain(request("explain", { reference: "Genesis 1:1", passage: "In the beginning" })),
+    context(request("context", { reference: "Genesis 1:1", passage: "In the beginning" })),
+    translate(request("translate", { text: "In the beginning" })),
+  ]);
+
+  for (const response of responses) {
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toContain("OPENAI_API_KEY");
+  }
+  expect(mocks.create).not.toHaveBeenCalled();
+});

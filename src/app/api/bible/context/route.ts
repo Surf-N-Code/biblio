@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  getOpenRouter,
-  OPENROUTER_MODEL_QUICK,
-} from "@/lib/ai/openrouter-client";
+import { getOpenAI, getOpenAIModelQuick } from "@/lib/ai/openai-client";
 import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -35,10 +32,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Matthew Henry excerpt too long" }, { status: 400 });
   }
 
-  const client = getOpenRouter();
+  const client = getOpenAI();
   if (!client) {
     return NextResponse.json(
-      { error: "OPENROUTER_API_KEY is not configured" },
+      { error: "OPENAI_API_KEY is not configured" },
       { status: 503 },
     );
   }
@@ -58,7 +55,7 @@ export async function POST(request: Request) {
   }
 
   const completion = await client.chat.completions.create({
-    model: OPENROUTER_MODEL_QUICK,
+    model: getOpenAIModelQuick(),
     messages: [
       {
         role: "system",

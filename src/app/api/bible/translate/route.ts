@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  getOpenRouter,
-  OPENROUTER_MODEL_QUICK,
-} from "@/lib/ai/openrouter-client";
+import { getOpenAI, getOpenAIModelQuick } from "@/lib/ai/openai-client";
 import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -53,16 +50,16 @@ export async function POST(request: Request) {
     if (out) return NextResponse.json({ text: out, provider: "deepl" });
   }
 
-  const client = getOpenRouter();
+  const client = getOpenAI();
   if (!client) {
     return NextResponse.json(
-      { error: "Configure DEEPL_API_KEY or OPENROUTER_API_KEY" },
+      { error: "Configure DEEPL_API_KEY or OPENAI_API_KEY" },
       { status: 503 },
     );
   }
 
   const completion = await client.chat.completions.create({
-    model: OPENROUTER_MODEL_QUICK,
+    model: getOpenAIModelQuick(),
     messages: [
       {
         role: "system",
@@ -75,5 +72,5 @@ export async function POST(request: Request) {
   });
 
   const out = completion.choices[0]?.message?.content?.trim() ?? "";
-  return NextResponse.json({ text: out, provider: "openrouter" });
+  return NextResponse.json({ text: out, provider: "openai" });
 }
