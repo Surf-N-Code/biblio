@@ -120,7 +120,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
       ref={dialogRef}
       data-vaul-no-drag
       className={cn(
-        "fixed inset-0 z-100 m-0 hidden h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-3 outline-none backdrop:bg-black/50",
+        "pointer-events-auto fixed inset-0 z-100 m-0 hidden h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-3 outline-none backdrop:bg-black/50",
         /* UA `dialog:not([open]) { display:none }` loses to Tailwind `flex`; hide until `[open]` from showModal() */
         "open:flex open:items-center open:justify-center",
       )}
@@ -141,7 +141,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
           </h2>
           <button
             type="button"
-            onClick={() => dialogRef.current?.close()}
+            onClick={() => onOpenChange(false)}
             className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-900"
           >
             Schließen
