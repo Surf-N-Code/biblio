@@ -3,7 +3,7 @@ import "server-only";
 import { joinKeys } from "unstorage";
 import { loadChapterPlainText } from "@/lib/bible/api";
 import type { BibleReadLang } from "@/lib/bible/read-language";
-import { getSummaryProvider } from "@/lib/ai/summary-client";
+import { getOpenAI, getOpenAIModelQuick } from "@/lib/ai/openai-client";
 import { getPrevChapterSummaryStorage } from "@/lib/ai/prev-summary-storage";
 
 const PROMPT_VERSION = "1";
@@ -37,12 +37,12 @@ export async function getPreviousChaptersContext(
     return "Kontext konnte nicht geladen werden.";
   }
   const truncated = text.slice(0, 14_000);
-  const provider = getSummaryProvider();
-  if (!provider) {
+  const client = getOpenAI();
+  if (!client) {
     throw new Error("Summary provider is not configured");
   }
-  const completion = await provider.client.chat.completions.create({
-    model: provider.model,
+  const completion = await client.chat.completions.create({
+    model: getOpenAIModelQuick(),
     messages: [
       {
         role: "system",

@@ -15,24 +15,19 @@ import { getPreviousChaptersContext } from "@/lib/ai/prev-summary";
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
-  vi.stubEnv("OPENROUTER_API_KEY", "");
   mocks.chapter.mockResolvedValue("Previous chapter text");
   mocks.create.mockResolvedValue({choices: [{message: {content: "A generated summary."}}]});
 });
-it("generates chapter context using an OpenAI key without OpenRouter", async () => {
+it("generates chapter context using the OpenAI key", async () => {
   await expect(getPreviousChaptersContext("GEN", "genesis", 2)).resolves.toBe("A generated summary.");
   expect(mocks.options).toHaveBeenCalledWith(expect.objectContaining({apiKey: "test-openai-key", baseURL: "https://api.openai.com/v1"}));
   expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({model: "gpt-4o"}));
 });
-it("prefers the new OpenAI key over an obsolete OpenRouter key", async () => {
-  vi.stubEnv("OPENROUTER_API_KEY", "obsolete-key");
-  await getPreviousChaptersContext("GEN", "genesis", 2);
-  expect(mocks.options).toHaveBeenCalledWith(expect.objectContaining({apiKey: "test-openai-key"}));
-});
-it("still supports OpenRouter when it is the only configured provider", async () => {
-  vi.stubEnv("OPENAI_API_KEY", ""); vi.stubEnv("OPENROUTER_API_KEY", "router-key");
-  await expect(getPreviousChaptersContext("GEN", "genesis", 2)).resolves.toBe("A generated summary.");
-  expect(mocks.options).toHaveBeenCalledWith(expect.objectContaining({apiKey: "router-key", baseURL: "https://openrouter.ai/api/v1"}));
+it("requires the OpenAI key when generating an uncached chapter summary", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "");
+  await expect(getPreviousChaptersContext("GEN", "genesis", 2))
+    .rejects.toThrow("Summary provider is not configured");
+  expect(mocks.create).not.toHaveBeenCalled();
 });
 it("generates context even when Redis is rate-limited", async () => {
   mocks.hasItem.mockRejectedValue(new Error("rate-limited"));
