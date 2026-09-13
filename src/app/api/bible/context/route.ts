@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenAI, getOpenAIModelQuick } from "@/lib/ai/openai-client";
+import { openAIErrorResponse } from "@/lib/ai/openai-error";
 import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -54,21 +55,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const completion = await client.chat.completions.create({
-    model: getOpenAIModelQuick(),
-    messages: [
-      {
-        role: "system",
-        content:
-          "Du gibst historischen und literarischen Kontext zu Bibelstellen auf Deutsch (du-Form): Zeit, Ort, Genre, Anschluss an das Vorangehende. Nutze den Matthew-Henry-Auszug nur als eine historische Stimme unter anderen, nicht als alleinige Autorität. Neutral und knapp. Formatiere in Markdown (##, **fett**, Listen mit -). Kein Code-Block um den gesamten Text.",
-      },
-      {
-        role: "user",
-        content: userParts.join("\n"),
-      },
-    ],
-    max_tokens: 900,
-  });
+  let completion;
+  try {
+    completion = await client.chat.completions.create({
+      model: getOpenAIModelQuick(),
+      messages: [
+        {
+          role: "system",
+          content:
+            "Du gibst historischen und literarischen Kontext zu Bibelstellen auf Deutsch (du-Form): Zeit, Ort, Genre, Anschluss an das Vorangehende. Nutze den Matthew-Henry-Auszug nur als eine historische Stimme unter anderen, nicht als alleinige Autorität. Neutral und knapp. Formatiere in Markdown (##, **fett**, Listen mit -). Kein Code-Block um den gesamten Text.",
+        },
+        {
+          role: "user",
+          content: userParts.join("\n"),
+        },
+      ],
+      max_tokens: 900,
+    });
+  } catch (error) {
+    return openAIErrorResponse(error);
+  }
 
   const text = completion.choices[0]?.message?.content?.trim() ?? "";
   return NextResponse.json({ text });

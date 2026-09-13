@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenAI, getOpenAIModelQuick, getOpenAIModelComplex } from "@/lib/ai/openai-client";
+import { openAIErrorResponse } from "@/lib/ai/openai-error";
 import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -43,20 +44,25 @@ export async function POST(request: Request) {
   const model =
     detail === "brief" ? getOpenAIModelQuick() : getOpenAIModelComplex();
 
-  const completion = await client.chat.completions.create({
-    model,
-    messages: [
-      {
-        role: "system",
-        content: `Du bist ein Bibellektor. ${instruction} Keine Predigt, keine persönliche Seelsorge. Formatiere die Antwort in Markdown (z. B. ## für Abschnitte, **fett** für Kernbegriffe, Aufzählungen mit -). Kein Code-Block um den gesamten Text.`,
-      },
-      {
-        role: "user",
-        content: `Stelle: ${reference}\n\nText:\n${passage}`,
-      },
-    ],
-    max_tokens: detail === "brief" ? 400 : 1200,
-  });
+  let completion;
+  try {
+    completion = await client.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: `Du bist ein Bibellektor. ${instruction} Keine Predigt, keine persönliche Seelsorge. Formatiere die Antwort in Markdown (z. B. ## für Abschnitte, **fett** für Kernbegriffe, Aufzählungen mit -). Kein Code-Block um den gesamten Text.`,
+        },
+        {
+          role: "user",
+          content: `Stelle: ${reference}\n\nText:\n${passage}`,
+        },
+      ],
+      max_tokens: detail === "brief" ? 400 : 1200,
+    });
+  } catch (error) {
+    return openAIErrorResponse(error);
+  }
 
   const text = completion.choices[0]?.message?.content?.trim() ?? "";
   return NextResponse.json({ text });

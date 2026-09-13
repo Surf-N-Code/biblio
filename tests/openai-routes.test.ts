@@ -80,3 +80,18 @@ it("names the OpenAI key when AI tools have no configured provider", async () =>
   }
   expect(mocks.create).not.toHaveBeenCalled();
 });
+
+it("reports exhausted OpenAI credits instead of returning an empty server error", async () => {
+  mocks.create.mockRejectedValue({ status: 429, code: "credit_balance_exhausted" });
+  const bodies = [
+    [explain, request("explain", { reference: "Genesis 1:1", passage: "In the beginning" })],
+    [context, request("context", { reference: "Genesis 1:1", passage: "In the beginning" })],
+    [translate, request("translate", { text: "In the beginning" })],
+  ] as const;
+
+  for (const [handler, input] of bodies) {
+    const response = await handler(input);
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toMatch(/OpenAI.*Guthaben/);
+  }
+});
