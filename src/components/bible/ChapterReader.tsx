@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, MessageCircle, Orbit, ScrollText } from "lucide-react";
+import { Copy, MessageCircle, MessageCircleQuestionMark, Orbit, ScrollText, Send } from "lucide-react";
 import { Drawer } from "vaul";
 import { AiMarkdownModal } from "@/components/bible/AiMarkdownModal";
 import { cn } from "@/lib/utils/cn";
@@ -142,6 +142,8 @@ export function ChapterReader({
   const [noteDraft, setNoteDraft] = useState("");
   const [lastAiKind, setLastAiKind] = useState<VerseNoteAiKind | undefined>();
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [questionOpen, setQuestionOpen] = useState(false);
+  const [questionDraft, setQuestionDraft] = useState("");
   const prevAiLoading = useRef<string | null>(null);
 
   useEffect(() => {
@@ -344,6 +346,32 @@ export function ChapterReader({
     }
   };
 
+  const runAsk = async () => {
+    const question = questionDraft.trim();
+    if (!question || !passageText) return;
+    setLastAiKind("question");
+    setAiLoading("question");
+    setAiPanel(null);
+    try {
+      const res = await fetch("/api/bible/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference, passage: passageText, question }),
+      });
+      const json = (await res.json()) as { text?: string; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Frage fehlgeschlagen.");
+      setAiPanel(
+        json.text?.trim()
+          ? `## Deine Frage\n${question}\n\n## Antwort\n${json.text}`
+          : "Die KI hat keine Antwort zurückgegeben.",
+      );
+    } catch (e) {
+      setAiPanel(e instanceof Error ? e.message : "Frage fehlgeschlagen.");
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
   const selectedVerseNums = useMemo(
     () => [...selected].sort((a, b) => a - b),
     [selected],
@@ -488,6 +516,8 @@ export function ChapterReader({
             setAiModalOpen(false);
             setMhText(null);
             setNoteDraft("");
+            setQuestionOpen(false);
+            setQuestionDraft("");
           }
         }}
       >
@@ -598,7 +628,55 @@ export function ChapterReader({
                   <Orbit className={kiIconClass} aria-hidden />
                 )}
               </button>
+              <button
+                type="button"
+                onClick={() => setQuestionOpen((open) => !open)}
+                disabled={!!aiLoading}
+                aria-expanded={questionOpen}
+                className={cn(kiIconBtnClass, "w-auto min-w-0 gap-2 px-4")}
+                title="Eigene Frage zu ausgewählten Versen stellen"
+              >
+                <MessageCircleQuestionMark className={kiIconClass} aria-hidden />
+                <span className="whitespace-nowrap text-sm font-medium">KI fragen</span>
+              </button>
             </div>
+
+            {questionOpen && (
+              <form
+                className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/80"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void runAsk();
+                }}
+              >
+                <label
+                  htmlFor="ai-verse-question"
+                  className="block text-sm font-medium text-zinc-900 dark:text-zinc-100"
+                >
+                  Deine Frage zu {reference}
+                </label>
+                <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                  Die KI nutzt die ausgewählten Verse als Kontext.
+                </p>
+                <textarea
+                  id="ai-verse-question"
+                  value={questionDraft}
+                  onChange={(event) => setQuestionDraft(event.target.value)}
+                  maxLength={2000}
+                  rows={3}
+                  placeholder="Was möchtest du zu dieser Stelle wissen?"
+                  className="mt-3 w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                />
+                <button
+                  type="submit"
+                  disabled={!!aiLoading || !questionDraft.trim()}
+                  className="mt-2 inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
+                >
+                  <Send className="h-4 w-4" aria-hidden />
+                  {aiLoading === "question" ? "Antwort wird geladen …" : "Frage senden"}
+                </button>
+              </form>
+            )}
 
             {hasMatthewHenry && (
               <div className="mt-4 max-h-80 overflow-y-auto rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">

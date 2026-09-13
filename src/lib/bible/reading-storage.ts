@@ -20,6 +20,7 @@ export type VerseNoteAiKind =
   | "explain-brief"
   | "explain-long"
   | "context"
+  | "question"
   | "german"
   | "matthew-henry"
   | "other";
