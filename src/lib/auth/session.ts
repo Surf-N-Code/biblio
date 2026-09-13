@@ -93,10 +93,16 @@ async function loadSessionByToken(
   if (!token || token.length !== 64 || !/^[a-f0-9]+$/i.test(token)) {
     return null;
   }
-  const st = getSessionStorage();
-  if (!st) return null;
-  const raw = await st.getItem(token);
-  return parseSessionPayload(raw);
+  try {
+    const st = getSessionStorage();
+    if (!st) return null;
+    const raw = await st.getItem(token);
+    return parseSessionPayload(raw);
+  } catch {
+    // Fail closed without crashing the proxy or the shared page layout.
+    console.error("[auth] Session storage unavailable");
+    return null;
+  }
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
@@ -116,11 +122,16 @@ export async function getSessionFromRequest(
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (token) {
-    const st = getSessionStorage();
-    if (st) await st.removeItem(token);
+  try {
+    if (token) {
+      const st = getSessionStorage();
+      if (st) await st.removeItem(token);
+    }
+  } catch {
+    console.error("[auth] Session revocation unavailable; clearing browser cookie");
+  } finally {
+    cookieStore.delete(SESSION_COOKIE);
   }
-  cookieStore.delete(SESSION_COOKIE);
 }
 
 /**
