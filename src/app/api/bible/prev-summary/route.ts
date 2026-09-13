@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPreviousChaptersContext } from "@/lib/ai/prev-summary";
+import { openAIErrorMessage } from "@/lib/ai/openai-error";
 import { getBibleReadLangFromCookies } from "@/lib/bible/read-language-server";
 
 export const runtime = "nodejs";
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
         ? error.code : undefined;
     console.error("[prev-summary] Context generation unavailable", { status, code });
     return NextResponse.json(
-      { error: "Kontext ist vorübergehend nicht verfügbar. Bitte versuche es später erneut." },
+      { error: openAIErrorMessage(error) },
       { status: 503 },
     );
   }

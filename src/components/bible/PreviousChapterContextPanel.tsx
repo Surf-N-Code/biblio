@@ -15,6 +15,7 @@ export function PreviousChapterContextPanel({
 }: Props) {
   const [summary, setSummary] = useState<string | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState("Kontext aus vorherigen Kapiteln konnte nicht geladen werden.");
 
   useEffect(() => {
     let cancelled = false;
@@ -27,7 +28,10 @@ export function PreviousChapterContextPanel({
 
     fetch(`/api/bible/prev-summary?${q}`, { cache: "no-store" })
       .then(async (res) => {
-        if (!res.ok) throw new Error(String(res.status));
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error || "Kontext aus vorherigen Kapiteln konnte nicht geladen werden.");
+        }
         return res.json() as Promise<{ summary?: string | null }>;
       })
       .then((data) => {
@@ -38,8 +42,9 @@ export function PreviousChapterContextPanel({
         );
         setPhase("ready");
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (cancelled) return;
+        setErrorMessage(error instanceof Error ? error.message : "Kontext aus vorherigen Kapiteln konnte nicht geladen werden.");
         setPhase("error");
         setSummary(null);
       });
@@ -56,7 +61,7 @@ export function PreviousChapterContextPanel({
         className="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400"
         role="status"
       >
-        <p>Kontext aus vorherigen Kapiteln konnte nicht geladen werden.</p>
+        <p>{errorMessage}</p>
       </aside>
     );
   }

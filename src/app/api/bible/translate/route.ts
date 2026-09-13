@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenAI, getOpenAIModelQuick } from "@/lib/ai/openai-client";
+import { openAIErrorResponse } from "@/lib/ai/openai-error";
 import { requireSession } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -58,18 +59,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const completion = await client.chat.completions.create({
-    model: getOpenAIModelQuick(),
-    messages: [
-      {
-        role: "system",
-        content:
-          "Translate the user text to German. Output only the translation, informal 'du' where appropriate for UI, preserve verse numbers and formatting loosely.",
-      },
-      { role: "user", content: text },
-    ],
-    max_tokens: 4000,
-  });
+  let completion;
+  try {
+    completion = await client.chat.completions.create({
+      model: getOpenAIModelQuick(),
+      messages: [
+        {
+          role: "system",
+          content:
+            "Translate the user text to German. Output only the translation, informal 'du' where appropriate for UI, preserve verse numbers and formatting loosely.",
+        },
+        { role: "user", content: text },
+      ],
+      max_tokens: 4000,
+    });
+  } catch (error) {
+    return openAIErrorResponse(error);
+  }
 
   const out = completion.choices[0]?.message?.content?.trim() ?? "";
   return NextResponse.json({ text: out, provider: "openai" });
