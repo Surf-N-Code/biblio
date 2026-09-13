@@ -125,11 +125,12 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
       )}
       aria-labelledby={titleId}
       aria-modal="true"
+      onCancel={(event) => event.preventDefault()}
       onClose={() => onOpenChange(false)}
     >
       <div
         className={cn(
-          "flex max-h-[min(100dvh-1.5rem,56rem)] w-full min-w-0 max-w-160 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl",
+          "flex max-h-[calc(100dvh-1.5rem)] w-full min-w-0 max-w-160 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl",
           "dark:border-zinc-700 dark:bg-zinc-950",
         )}
       >
