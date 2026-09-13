@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpenText, Orbit, Zap } from "lucide-react";
+import { Copy, MessageCircle, Orbit, ScrollText } from "lucide-react";
 import { Drawer } from "vaul";
 import { AiMarkdownModal } from "@/components/bible/AiMarkdownModal";
 import { cn } from "@/lib/utils/cn";
@@ -78,18 +78,6 @@ function saveSnippets(items: Snippet[]) {
   localStorage.setItem("biblio-snippets", JSON.stringify(items.slice(0, 200)));
 }
 
-function IconCopy(props: { className?: string }) {
-  return (
-    <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.793-2.023 1.839-.088.738.054 1.46.449 2.101.36.59.85 1.093 1.438 1.406A2.25 2.25 0 0 1 6 7.228V19.5a2.25 2.25 0 0 0 2.25 2.25h9.75A2.25 2.25 0 0 0 20 19.5V9.75a2.25 2.25 0 0 0-2.25-2.25h-.584m0 0A2.251 2.251 0 0 0 15.75 4.5h-1.5a2.251 2.251 0 0 0-2.15 1.586m0 0V6a2.25 2.25 0 0 0 2.25 2.25h1.5"
-      />
-    </svg>
-  );
-}
-
 function IconBookmarkSave(props: { className?: string }) {
   return (
     <svg className={props.className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden>
@@ -106,7 +94,7 @@ function IconLanguageDe(props: { className?: string }) {
   );
 }
 
-const kiIconClass = "h-4 w-4 shrink-0 stroke-[1.5]";
+const kiIconClass = "h-5 w-5 shrink-0 stroke-[1.75]";
 
 const toolbarIconBtnClass =
   "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-800 transition-colors hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900";
@@ -490,6 +478,7 @@ export function ChapterReader({
 
       <Drawer.Root
         shouldScaleBackground={false}
+        dismissible={!aiModalOpen}
         open={drawerOpen && selected.size > 0}
         onOpenChange={(open) => {
           setDrawerOpen(open);
@@ -536,7 +525,7 @@ export function ChapterReader({
                   aria-label="Auswahl kopieren"
                   title="Kopieren"
                 >
-                  <IconCopy className="h-[1.125rem] w-[1.125rem]" />
+                  <Copy className="h-[1.125rem] w-[1.125rem]" aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -578,7 +567,7 @@ export function ChapterReader({
                 {aiLoading === "explain-brief" ? (
                   <span className="text-sm font-semibold">…</span>
                 ) : (
-                  <Zap className={kiIconClass} aria-hidden />
+                  <MessageCircle className={kiIconClass} aria-hidden />
                 )}
               </button>
               <button
@@ -592,7 +581,7 @@ export function ChapterReader({
                 {aiLoading === "explain-long" ? (
                   <span className="text-sm font-semibold">…</span>
                 ) : (
-                  <BookOpenText className={kiIconClass} aria-hidden />
+                  <ScrollText className={kiIconClass} aria-hidden />
                 )}
               </button>
               <button
