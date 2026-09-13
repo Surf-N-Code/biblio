@@ -118,6 +118,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
   return (
     <dialog
       ref={dialogRef}
+      data-vaul-no-drag
       className={cn(
         "fixed inset-0 z-100 m-0 hidden h-dvh max-h-none w-full max-w-none overflow-hidden border-0 bg-transparent p-3 outline-none backdrop:bg-black/50",
         /* UA `dialog:not([open]) { display:none }` loses to Tailwind `flex`; hide until `[open]` from showModal() */
