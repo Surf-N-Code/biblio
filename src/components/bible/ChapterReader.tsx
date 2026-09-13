@@ -506,7 +506,7 @@ export function ChapterReader({
 
       <Drawer.Root
         shouldScaleBackground={false}
-        dismissible={!aiModalOpen}
+        dismissible={!aiModalOpen && !questionOpen}
         open={drawerOpen && selected.size > 0}
         onOpenChange={(open) => {
           setDrawerOpen(open);
@@ -643,6 +643,7 @@ export function ChapterReader({
 
             {questionOpen && (
               <form
+                data-vaul-no-drag
                 className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/80"
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -667,14 +668,23 @@ export function ChapterReader({
                   placeholder="Was möchtest du zu dieser Stelle wissen?"
                   className="mt-3 w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
                 />
-                <button
-                  type="submit"
-                  disabled={!!aiLoading || !questionDraft.trim()}
-                  className="mt-2 inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  <Send className="h-4 w-4" aria-hidden />
-                  {aiLoading === "question" ? "Antwort wird geladen …" : "Frage senden"}
-                </button>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="submit"
+                    disabled={!!aiLoading || !questionDraft.trim()}
+                    className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    <Send className="h-4 w-4" aria-hidden />
+                    {aiLoading === "question" ? "Antwort wird geladen …" : "Frage senden"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuestionOpen(false)}
+                    className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 dark:border-zinc-600 dark:text-zinc-200"
+                  >
+                    Eingabe schließen
+                  </button>
+                </div>
               </form>
             )}
 
