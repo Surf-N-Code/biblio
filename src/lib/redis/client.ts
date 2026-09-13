@@ -13,7 +13,9 @@ export function getRedis(): Redis | undefined {
       ...parseRedisUrlToOptions(url),
       // Avoid long hangs in API requests when Redis is unstable.
       maxRetriesPerRequest: 1,
-      enableOfflineQueue: false,
+      // Queue the first command until the socket is ready, with a bounded wait.
+      enableOfflineQueue: true,
+      commandTimeout: 5000,
       connectTimeout: 5000,
       retryStrategy: (attempt) => Math.min(attempt * 200, 2_000),
     });

@@ -78,7 +78,7 @@ async function fetchReadProgressFromApi(): Promise<{
 async function pushReadProgressToApi(keys: string[]): Promise<void> {
   if (!remoteReadProgressEnabled) return;
   const unique = [...new Set(keys)].sort();
-  await fetch("/api/bible/read-progress", {
+  const res = await fetch("/api/bible/read-progress", {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -87,23 +87,27 @@ async function pushReadProgressToApi(keys: string[]): Promise<void> {
     credentials: "include",
     cache: "no-store",
   });
+  if (!res.ok) throw new Error("Failed to save reading progress");
 }
 
 function scheduleRemoteReadProgressSave(keys: string[]) {
   if (!remoteReadProgressEnabled) return;
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = setTimeout(() => {
-    void pushReadProgressToApi(keys);
+    void pushReadProgressToApi(keys).catch(() => {
+      remoteReadProgressEnabled = false;
+      readProgressSyncPromise = null;
+    });
   }, 400);
 }
 
-async function performReadProgressSync(): Promise<void> {
-  if (typeof window === "undefined") return;
+async function performReadProgressSync(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   try {
     const { synced, keys, username } = await fetchReadProgressFromApi();
     if (!synced) {
       remoteReadProgressEnabled = false;
-      return;
+      return false;
     }
     remoteReadProgressEnabled = true;
     const local = loadReadArray();
@@ -114,18 +118,20 @@ async function performReadProgressSync(): Promise<void> {
     if (accountSwitch) {
       saveReadArray(keys, { skipRemote: true });
       if (username !== undefined) saveReadProgressOwner(username);
-      return;
+      return true;
     }
 
     if (keys.length === 0 && local.length > 0) {
       await pushReadProgressToApi(local);
       if (username !== undefined) saveReadProgressOwner(username);
-      return;
+      return true;
     }
     saveReadArray(keys, { skipRemote: true });
     if (username !== undefined) saveReadProgressOwner(username);
+    return true;
   } catch {
     remoteReadProgressEnabled = false;
+    return false;
   }
 }
 
@@ -136,7 +142,10 @@ async function performReadProgressSync(): Promise<void> {
 export function initReadProgressSync(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (!readProgressSyncPromise) {
-    readProgressSyncPromise = performReadProgressSync();
+    readProgressSyncPromise = performReadProgressSync().then((synced) => {
+      // Anonymous visits and outages must not prevent a later authenticated sync.
+      if (!synced) readProgressSyncPromise = null;
+    });
   }
   return readProgressSyncPromise;
 }
