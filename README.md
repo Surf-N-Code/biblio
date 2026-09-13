@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Login and chapter context configuration
+
+- `BIBLIO_REDIS_URL` stores accounts, sessions, reading progress, and cached chapter summaries. `PREV_SUMMARY_REDIS_URL` remains a fallback. Existing accounts require access to the original database.
+- `OPENAI_API_KEY` enables previous-chapter summaries directly through OpenAI. Optional `OPENAI_MODEL_QUICK` defaults to `gpt-4o`.
+- If `OPENAI_API_KEY` is absent, summaries use `OPENROUTER_API_KEY` and `OPENROUTER_MODEL_QUICK` as before. Other AI tools still use OpenRouter. OpenAI and OpenRouter credentials are not interchangeable.
+
+Configure these in `.env.local` for local development and in the appropriate Vercel environment for deployment. Redeploy after changing Vercel environment variables. Never commit keys.
+
+If Upstash reports that the database is temporarily rate-limited, restore database access through Upstash. The app handles the outage without crashing, but cannot authenticate existing accounts until the database is available. A new empty database will not contain existing accounts or reading progress.
+
+Run regression tests with `pnpm test`.

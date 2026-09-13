@@ -3,10 +3,7 @@ import "server-only";
 import { joinKeys } from "unstorage";
 import { loadChapterPlainText } from "@/lib/bible/api";
 import type { BibleReadLang } from "@/lib/bible/read-language";
-import {
-  getOpenRouter,
-  OPENROUTER_MODEL_QUICK,
-} from "@/lib/ai/openrouter-client";
+import { getSummaryProvider } from "@/lib/ai/summary-client";
 import { getPrevChapterSummaryStorage } from "@/lib/ai/prev-summary-storage";
 
 const PROMPT_VERSION = "1";
@@ -40,12 +37,12 @@ export async function getPreviousChaptersContext(
     return "Kontext konnte nicht geladen werden.";
   }
   const truncated = text.slice(0, 14_000);
-  const client = getOpenRouter();
-  if (!client) {
-    return "Setze OPENROUTER_API_KEY für eine KI-Zusammenfassung der vorherigen Kapitel.";
+  const provider = getSummaryProvider();
+  if (!provider) {
+    throw new Error("Summary provider is not configured");
   }
-  const completion = await client.chat.completions.create({
-    model: OPENROUTER_MODEL_QUICK,
+  const completion = await provider.client.chat.completions.create({
+    model: provider.model,
     messages: [
       {
         role: "system",

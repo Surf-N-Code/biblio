@@ -18,6 +18,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid chapter" }, { status: 400 });
   }
   const lang = await getBibleReadLangFromCookies();
-  const summary = await getPreviousChaptersContext(usfm, slug, chapter, lang);
-  return NextResponse.json({ summary });
+  try {
+    const summary = await getPreviousChaptersContext(usfm, slug, chapter, lang);
+    return NextResponse.json({ summary });
+  } catch (error) {
+    // Log the provider status without credentials, response headers, or prompt text.
+    const status =
+      typeof error === "object" && error !== null && "status" in error &&
+      typeof error.status === "number" ? error.status : undefined;
+    const code =
+      typeof error === "object" && error !== null && "code" in error &&
+      typeof error.code === "string" && /^[a-z_]+$/.test(error.code)
+        ? error.code : undefined;
+    console.error("[prev-summary] Context generation unavailable", { status, code });
+    return NextResponse.json(
+      { error: "Kontext ist vorübergehend nicht verfügbar. Bitte versuche es später erneut." },
+      { status: 503 },
+    );
+  }
 }

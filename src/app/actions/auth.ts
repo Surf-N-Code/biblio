@@ -17,6 +17,9 @@ export type AuthFormState = {
   error?: string;
 };
 
+const STORAGE_ERROR =
+  "Anmeldung ist vorübergehend nicht möglich. Bitte versuche es später erneut.";
+
 const USERNAME_RE = /^[a-zA-Z0-9]{3,20}$/;
 
 function validateUsername(raw: string): string | null {
@@ -57,15 +60,19 @@ export async function signup(
     };
   }
 
-  const created = await createUser(username, pw);
-  if (!created.ok) {
-    if (created.error === "taken") {
-      return { error: "Dieser Benutzername ist schon vergeben." };
+  try {
+    const created = await createUser(username, pw);
+    if (!created.ok) {
+      if (created.error === "taken") {
+        return { error: "Dieser Benutzername ist schon vergeben." };
+      }
+      return { error: "Registrierung fehlgeschlagen. Bitte erneut versuchen." };
     }
-    return { error: "Registrierung fehlgeschlagen. Bitte erneut versuchen." };
+    await createSession(username);
+  } catch {
+    console.error("[auth] Registration storage unavailable");
+    return { error: STORAGE_ERROR };
   }
-
-  await createSession(username);
   redirect("/read");
 }
 
@@ -88,12 +95,16 @@ export async function login(
     };
   }
 
-  const user = await getUser(username);
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return { error: "Ungültiger Benutzername oder Passwort." };
+  try {
+    const user = await getUser(username);
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      return { error: "Ungültiger Benutzername oder Passwort." };
+    }
+    await createSession(user.username);
+  } catch {
+    console.error("[auth] Login storage unavailable");
+    return { error: STORAGE_ERROR };
   }
-
-  await createSession(user.username);
   redirect("/read");
 }
 

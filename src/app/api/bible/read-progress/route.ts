@@ -34,11 +34,16 @@ export async function GET() {
   if (!isReadProgressRedisEnabled()) {
     return NextResponse.json({ synced: false, keys: [] as string[] });
   }
-  const keys = await redisGetReadProgressKeys(username);
-  if (keys === null) {
-    return NextResponse.json({ synced: false, keys: [] as string[] });
+  try {
+    const keys = await redisGetReadProgressKeys(username);
+    if (keys === null) {
+      return NextResponse.json({ synced: false, keys: [] as string[] });
+    }
+    return NextResponse.json({ synced: true, keys, username });
+  } catch {
+    console.error("[read-progress] Redis read unavailable");
+    return NextResponse.json({ error: "Failed to load progress" }, { status: 503 });
   }
-  return NextResponse.json({ synced: true, keys, username });
 }
 
 export async function PUT(request: Request) {
