@@ -523,7 +523,7 @@ export function ChapterReader({
       >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[96vh] min-h-0 flex-col overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl dark:border-zinc-800 dark:bg-zinc-950 max-sm:min-h-[80vh] sm:max-h-[88vh] sm:p-4 sm:pb-8">
+          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[96vh] min-h-0 flex-col overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl dark:border-zinc-800 dark:bg-zinc-950 sm:max-h-[88vh] sm:p-4 sm:pb-8">
             <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
             <Drawer.Title className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
               Ausgewählte Verse
