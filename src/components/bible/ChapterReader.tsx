@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, MessageCircle, MessageCircleQuestionMark, Orbit, ScrollText, Send } from "lucide-react";
+import { Copy, MessageCircle, MessageCircleQuestionMark, Orbit, ScrollText, Send, Sparkles } from "lucide-react";
 import { Drawer } from "vaul";
 import { AiMarkdownModal } from "@/components/bible/AiMarkdownModal";
 import { cn } from "@/lib/utils/cn";
@@ -11,6 +11,7 @@ import {
   type VerseNoteAiKind,
 } from "@/lib/bible/reading-storage";
 import type { BibleReadLang } from "@/lib/bible/read-language";
+import { VERSE_AI_LABELS, type VerseAiAnswer, type VerseAiKind } from "@/lib/bible/verse-ai-answer";
 
 const HIGHLIGHT_PRESETS = [
   { id: "yellow", label: "Gelb", className: "bg-amber-200/90 dark:bg-amber-900/50" },
@@ -144,11 +145,36 @@ export function ChapterReader({
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [questionOpen, setQuestionOpen] = useState(false);
   const [questionDraft, setQuestionDraft] = useState("");
+  const [savedAnswers, setSavedAnswers] = useState<VerseAiAnswer[]>([]);
+  const [historyError, setHistoryError] = useState(false);
+  const [historySaveWarning, setHistorySaveWarning] = useState(false);
+  const [expandedHistoryVerse, setExpandedHistoryVerse] = useState<number | null>(null);
+  const [historyModalText, setHistoryModalText] = useState<string | null>(null);
   const prevAiLoading = useRef<string | null>(null);
 
   useEffect(() => {
     setHighlights(loadHighlights(storageKey));
   }, [storageKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const query = new URLSearchParams({ usfm, chapter: String(chapter) });
+    fetch(`/api/bible/ai-answers?${query}`, { credentials: "include", cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("History unavailable");
+        return response.json() as Promise<{ answers: VerseAiAnswer[] }>;
+      })
+      .then(({ answers }) => {
+        setSavedAnswers((previous) => {
+          const ids = new Set(answers.map((answer) => answer.id));
+          return [...previous.filter((answer) => !ids.has(answer.id)), ...answers]
+            .sort((a, b) => b.createdAt - a.createdAt);
+        });
+        setHistoryError(false);
+      })
+      .catch(() => { if (!controller.signal.aborted) setHistoryError(true); });
+    return () => controller.abort();
+  }, [usfm, chapter]);
 
   useEffect(() => {
     if (prevAiLoading.current && aiLoading === null && aiPanel?.trim()) {
@@ -199,6 +225,19 @@ export function ChapterReader({
     return new Map(amplified.map((v) => [v.verse, v.text]));
   }, [amplified]);
 
+  const answersByVerse = useMemo(() => {
+    const map = new Map<number, VerseAiAnswer[]>();
+    for (const answer of savedAnswers) {
+      if (answer.usfm !== usfm.toUpperCase() || answer.chapter !== chapter) continue;
+      for (const verse of answer.verses) {
+        const entries = map.get(verse) ?? [];
+        entries.push(answer);
+        map.set(verse, entries);
+      }
+    }
+    return map;
+  }, [savedAnswers, usfm, chapter]);
+
   const toggleVerse = useCallback((verseNum: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -217,6 +256,30 @@ export function ChapterReader({
     () => buildPassage(primary, selected),
     [primary, selected],
   );
+
+  const recordGeneratedAnswer = async (kind: VerseAiKind, text: string) => {
+    const response = await fetch("/api/bible/ai-answers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ usfm, chapter, verses: [...selected].sort((a, b) => a - b), reference, kind, text }),
+    });
+    if (!response.ok) throw new Error("History save failed");
+    const { answer } = (await response.json()) as { answer: VerseAiAnswer };
+    setSavedAnswers((previous) => [answer, ...previous]);
+  };
+
+  const showGeneratedAnswer = async (kind: VerseAiKind, text: string) => {
+    const answer = text.trim();
+    if (answer) {
+      try {
+        await recordGeneratedAnswer(kind, answer);
+      } catch {
+        setHistorySaveWarning(true);
+      }
+    }
+    setAiPanel(answer || "Die KI hat keine Antwort zurückgegeben.");
+  };
 
   const applyHighlight = (colorId: string) => {
     setHighlights((prev) => {
@@ -288,6 +351,7 @@ export function ChapterReader({
   };
 
   const runExplain = async (detail: "brief" | "extensive") => {
+    setHistorySaveWarning(false);
     setLastAiKind(detail === "brief" ? "explain-brief" : "explain-long");
     setAiLoading(detail === "brief" ? "explain-brief" : "explain-long");
     setAiPanel(null);
@@ -303,7 +367,7 @@ export function ChapterReader({
       });
       const json = (await res.json()) as { text?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Fehler");
-      setAiPanel(json.text ?? "");
+      await showGeneratedAnswer(detail === "brief" ? "explain-brief" : "explain-long", json.text ?? "");
     } catch (e) {
       setAiPanel(e instanceof Error ? e.message : "Erklärung fehlgeschlagen.");
     } finally {
@@ -312,6 +376,7 @@ export function ChapterReader({
   };
 
   const runContext = async () => {
+    setHistorySaveWarning(false);
     setLastAiKind("context");
     setAiLoading("context");
     setAiPanel(null);
@@ -338,7 +403,7 @@ export function ChapterReader({
       });
       const json = (await res.json()) as { text?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Fehler");
-      setAiPanel(json.text ?? "");
+      await showGeneratedAnswer("context", json.text ?? "");
     } catch (e) {
       setAiPanel(e instanceof Error ? e.message : "Kontext fehlgeschlagen.");
     } finally {
@@ -349,6 +414,7 @@ export function ChapterReader({
   const runAsk = async () => {
     const question = questionDraft.trim();
     if (!question || !passageText) return;
+    setHistorySaveWarning(false);
     setLastAiKind("question");
     setAiLoading("question");
     setAiPanel(null);
@@ -360,11 +426,8 @@ export function ChapterReader({
       });
       const json = (await res.json()) as { text?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Frage fehlgeschlagen.");
-      setAiPanel(
-        json.text?.trim()
-          ? `## Deine Frage\n${question}\n\n## Antwort\n${json.text}`
-          : "Die KI hat keine Antwort zurückgegeben.",
-      );
+      await showGeneratedAnswer("question", json.text?.trim()
+        ? `## Deine Frage\n${question}\n\n## Antwort\n${json.text}` : "");
     } catch (e) {
       setAiPanel(e instanceof Error ? e.message : "Frage fehlgeschlagen.");
     } finally {
@@ -457,26 +520,58 @@ export function ChapterReader({
             {primary.map((v) => {
               const selectedRow = selected.has(v.verse);
               const hl = highlightClassForVerse(v.verse);
+              const verseAnswers = answersByVerse.get(v.verse) ?? [];
               return (
-                <button
-                  key={v.verse}
-                  type="button"
-                  data-verse={v.verse}
-                  onClick={() => toggleVerse(v.verse)}
-                  className={cn(
-                    "flex w-full gap-2 rounded-md px-1 py-1.5 text-left transition-colors",
-                    hl,
-                    selectedRow && "ring-2 ring-zinc-400 dark:ring-zinc-500",
-                    !hl && selectedRow && "bg-zinc-200/80 dark:bg-zinc-800/80",
-                    !hl && !selectedRow && "hover:bg-zinc-100 dark:hover:bg-zinc-900/80",
+                <div key={v.verse}>
+                  <div className="flex items-start gap-1">
+                    <button
+                      type="button"
+                      data-verse={v.verse}
+                      onClick={() => toggleVerse(v.verse)}
+                      className={cn(
+                        "flex min-w-0 flex-1 gap-2 rounded-md px-1 py-1.5 text-left transition-colors",
+                        hl,
+                        selectedRow && "ring-2 ring-zinc-400 dark:ring-zinc-500",
+                        !hl && selectedRow && "bg-zinc-200/80 dark:bg-zinc-800/80",
+                        !hl && !selectedRow && "hover:bg-zinc-100 dark:hover:bg-zinc-900/80",
+                      )}
+                      aria-pressed={selectedRow}
+                    >
+                      <sup className="shrink-0 min-w-[1.75rem] text-xs font-semibold text-zinc-500 dark:text-zinc-400 tabular-nums">
+                        {v.verse}
+                      </sup>
+                      <span className="flex-1">{v.text}</span>
+                    </button>
+                    {verseAnswers.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedHistoryVerse(expandedHistoryVerse === v.verse ? null : v.verse)}
+                        aria-expanded={expandedHistoryVerse === v.verse}
+                        aria-label={`${verseAnswers.length} KI-Antworten zu Vers ${v.verse} anzeigen`}
+                        title={`${verseAnswers.length} KI-Antworten anzeigen`}
+                        className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full border border-sky-300 px-2 text-xs font-medium text-sky-800 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-200 dark:hover:bg-sky-950"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                        {verseAnswers.length}
+                      </button>
+                    )}
+                  </div>
+                  {expandedHistoryVerse === v.verse && verseAnswers.length > 0 && (
+                    <section className="ml-8 mt-1 mb-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3 dark:border-sky-900 dark:bg-sky-950/40" aria-label={`KI-Antworten zu Vers ${v.verse}`}>
+                      <p className="mb-2 text-sm font-semibold">KI-Antworten zu Vers {v.verse}</p>
+                      <ul className="space-y-2">
+                        {verseAnswers.map((answer) => (
+                          <li key={answer.id}>
+                            <button type="button" onClick={() => setHistoryModalText(answer.text)} className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-left text-sm hover:bg-sky-100 dark:border-sky-800 dark:bg-zinc-900 dark:hover:bg-sky-950">
+                              <span className="font-medium">{VERSE_AI_LABELS[answer.kind]}</span>
+                              <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{answer.reference} · {new Date(answer.createdAt).toLocaleString("de-DE")}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
                   )}
-                  aria-pressed={selectedRow}
-                >
-                  <sup className="shrink-0 min-w-[1.75rem] text-xs font-semibold text-zinc-500 dark:text-zinc-400 tabular-nums">
-                    {v.verse}
-                  </sup>
-                  <span className="flex-1">{v.text}</span>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -724,6 +819,11 @@ export function ChapterReader({
                 </button>
               </div>
             )}
+            {historySaveWarning && !aiLoading && (
+              <p className="mt-2 text-sm text-amber-700 dark:text-amber-300" role="status">
+                Die Antwort konnte nicht in deiner KI-Historie gespeichert werden. Bitte versuche es später erneut.
+              </p>
+            )}
 
             <div className="mt-4 space-y-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
               <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
@@ -769,6 +869,16 @@ export function ChapterReader({
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
+      {historyError && (
+        <p className="mt-4 text-sm text-amber-700 dark:text-amber-300" role="status">
+          Deine gespeicherten KI-Antworten konnten gerade nicht geladen werden. Lade die Seite später neu.
+        </p>
+      )}
+      <AiMarkdownModal
+        open={historyModalText !== null}
+        onOpenChange={(open) => { if (!open) setHistoryModalText(null); }}
+        markdown={historyModalText}
+      />
     </div>
   );
 }

@@ -122,8 +122,8 @@ export function ChapterNotesPanel({
         Notizen zu diesem Kapitel
       </h2>
       <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        Eigene Notizen und gespeicherte KI-Antworten erscheinen hier. Sie bleiben nur in diesem
-        Browser gespeichert.
+        Manuell gespeicherte Notizen bleiben in diesem Browser. Automatisch gespeicherte
+        KI-Antworten findest du direkt beim jeweiligen Vers.
       </p>
 
       <div className="mt-4 space-y-3">
