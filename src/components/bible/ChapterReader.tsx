@@ -673,15 +673,14 @@ export function ChapterReader({
                 {toast}
               </p>
             )}
+            <AiMarkdownModal
+              open={aiModalOpen}
+              onOpenChange={setAiModalOpen}
+              markdown={aiPanel}
+            />
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
-
-      <AiMarkdownModal
-        open={aiModalOpen}
-        onOpenChange={setAiModalOpen}
-        markdown={aiPanel}
-      />
     </div>
   );
 }
