@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  bibleAiSystemSuffix,
+  buildBibleAiUserContent,
+  parseBibleAiBody,
+} from "@/lib/ai/bible-prompt-context";
 import { getOpenAI, getOpenAIModelQuick, getOpenAIModelComplex } from "@/lib/ai/openai-client";
 import { openAIErrorResponse } from "@/lib/ai/openai-error";
 import { requireSession } from "@/lib/auth/session";
@@ -8,6 +13,8 @@ export const runtime = "nodejs";
 type Body = {
   reference: string;
   passage: string;
+  chapterText?: string;
+  bookName?: string;
   detail?: "brief" | "extensive";
 };
 
@@ -21,12 +28,11 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const passage = typeof body.passage === "string" ? body.passage.trim() : "";
-  const reference = typeof body.reference === "string" ? body.reference.trim() : "";
-  const detail = body.detail === "extensive" ? "extensive" : "brief";
-  if (!passage || passage.length > 50_000) {
+  const parsed = parseBibleAiBody(body as Record<string, unknown>);
+  if (!parsed) {
     return NextResponse.json({ error: "Invalid passage" }, { status: 400 });
   }
+  const detail = body.detail === "extensive" ? "extensive" : "brief";
 
   const client = getOpenAI();
   if (!client) {
@@ -51,11 +57,16 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: `Du bist ein Bibellektor. ${instruction} Keine Predigt, keine persönliche Seelsorge. Formatiere die Antwort in Markdown (z. B. ## für Abschnitte, **fett** für Kernbegriffe, Aufzählungen mit -). Kein Code-Block um den gesamten Text.`,
+          content: `Du bist ein Bibellektor. ${instruction} ${bibleAiSystemSuffix()} Keine Predigt, keine persönliche Seelsorge. Formatiere die Antwort in Markdown (z. B. ## für Abschnitte, **fett** für Kernbegriffe, Aufzählungen mit -). Kein Code-Block um den gesamten Text.`,
         },
         {
           role: "user",
-          content: `Stelle: ${reference}\n\nText:\n${passage}`,
+          content: buildBibleAiUserContent({
+            reference: parsed.reference,
+            selectedPassage: parsed.selectedPassage,
+            chapterText: parsed.chapterText || parsed.selectedPassage,
+            bookName: parsed.bookName,
+          }),
         },
       ],
       max_tokens: detail === "brief" ? 400 : 1200,

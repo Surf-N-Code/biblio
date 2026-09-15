@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  bibleAiSystemSuffix,
+  buildBibleAiUserContent,
+  parseBibleAiBody,
+} from "@/lib/ai/bible-prompt-context";
 import { getOpenAI, getOpenAIModelQuick } from "@/lib/ai/openai-client";
 import { openAIErrorResponse } from "@/lib/ai/openai-error";
 import { requireSession } from "@/lib/auth/session";
@@ -8,6 +13,8 @@ export const runtime = "nodejs";
 type Body = {
   reference: string;
   passage: string;
+  chapterText?: string;
+  bookName?: string;
   /** Verse-scoped Matthew Henry excerpt (same selection as in the reader). */
   matthewHenryExcerpt?: string;
 };
@@ -22,13 +29,12 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const passage = typeof body.passage === "string" ? body.passage.trim() : "";
-  const reference = typeof body.reference === "string" ? body.reference.trim() : "";
-  const mh =
-    typeof body.matthewHenryExcerpt === "string" ? body.matthewHenryExcerpt.trim() : "";
-  if (!passage || passage.length > 50_000) {
+  const parsed = parseBibleAiBody(body as Record<string, unknown>);
+  if (!parsed) {
     return NextResponse.json({ error: "Invalid passage" }, { status: 400 });
   }
+  const mh =
+    typeof body.matthewHenryExcerpt === "string" ? body.matthewHenryExcerpt.trim() : "";
   if (mh.length > 120_000) {
     return NextResponse.json({ error: "Matthew Henry excerpt too long" }, { status: 400 });
   }
@@ -41,19 +47,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const userParts = [
-    `Stelle: ${reference}`,
-    "",
-    "Text:",
-    passage,
-  ];
-  if (mh) {
-    userParts.push(
-      "",
-      "Matthew Henry (Auszug nur zu dieser Auswahl; historischer Kommentar, öffentlicher Bereich):",
-      mh,
-    );
-  }
+  const extraSections = mh
+    ? [
+        "",
+        "Matthew Henry (Auszug nur zu dieser Auswahl; historischer Kommentar, öffentlicher Bereich):",
+        mh,
+      ]
+    : [];
+  const userContent = buildBibleAiUserContent(
+    {
+      reference: parsed.reference,
+      selectedPassage: parsed.selectedPassage,
+      chapterText: parsed.chapterText || parsed.selectedPassage,
+      bookName: parsed.bookName,
+    },
+    extraSections,
+  );
 
   let completion;
   try {
@@ -63,11 +72,11 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "Du gibst historischen und literarischen Kontext zu Bibelstellen auf Deutsch (du-Form): Zeit, Ort, Genre, Anschluss an das Vorangehende. Nutze den Matthew-Henry-Auszug nur als eine historische Stimme unter anderen, nicht als alleinige Autorität. Neutral und knapp. Formatiere in Markdown (##, **fett**, Listen mit -). Kein Code-Block um den gesamten Text.",
+            `Du gibst historischen und literarischen Kontext zu Bibelstellen auf Deutsch (du-Form): Zeit, Ort, Genre, Anschluss an das Vorangehende. ${bibleAiSystemSuffix()} Nutze den Matthew-Henry-Auszug nur als eine historische Stimme unter anderen, nicht als alleinige Autorität. Neutral und knapp. Formatiere in Markdown (##, **fett**, Listen mit -). Kein Code-Block um den gesamten Text.`,
         },
         {
           role: "user",
-          content: userParts.join("\n"),
+          content: userContent,
         },
       ],
       max_tokens: 900,

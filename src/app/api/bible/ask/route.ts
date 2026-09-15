@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  bibleAiSystemSuffix,
+  buildBibleAiUserContent,
+  parseBibleAiBody,
+} from "@/lib/ai/bible-prompt-context";
 import { getOpenAI, getOpenAIModelComplex } from "@/lib/ai/openai-client";
 import { openAIErrorResponse } from "@/lib/ai/openai-error";
 import { requireSession } from "@/lib/auth/session";
@@ -20,10 +25,9 @@ export async function POST(request: Request) {
   }
 
   const input = body as Record<string, unknown>;
-  const reference = typeof input.reference === "string" ? input.reference.trim() : "";
-  const passage = typeof input.passage === "string" ? input.passage.trim() : "";
+  const parsed = parseBibleAiBody(input);
   const question = typeof input.question === "string" ? input.question.trim() : "";
-  if (!reference || reference.length > 200 || !passage || passage.length > 50_000) {
+  if (!parsed) {
     return NextResponse.json({ error: "Invalid verse selection" }, { status: 400 });
   }
   if (!question || question.length > 2_000) {
@@ -46,11 +50,19 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "Du beantwortest Fragen zu ausgewählten Bibelversen auf Deutsch (du-Form). Beziehe dich konkret auf die angegebene Stelle und ihren Text. Unterscheide klar zwischen dem, was dort steht, und einer Deutung. Wenn die Stelle eine Frage nicht beantwortet, sage das offen; erfinde keinen Kontext und keine Quellen. Antworte sachlich und verständlich in Markdown, ohne Code-Block um die Antwort.",
+            `Du beantwortest Fragen zu ausgewählten Bibelversen auf Deutsch (du-Form). ${bibleAiSystemSuffix()} Beziehe dich konkret auf die angegebene Stelle, nutze aber auch den Kapitel- und Bibelkontext für breitere Fragen. Unterscheide klar zwischen dem, was dort steht, und einer Deutung. Wenn die Stelle eine Frage nicht beantwortet, sage das offen; erfinde keine Quellen. Antworte sachlich und verständlich in Markdown, ohne Code-Block um die Antwort.`,
         },
         {
           role: "user",
-          content: `Ausgewählte Stelle: ${reference}\n\nVers-Text:\n${passage}\n\nFrage:\n${question}`,
+          content: buildBibleAiUserContent(
+            {
+              reference: parsed.reference,
+              selectedPassage: parsed.selectedPassage,
+              chapterText: parsed.chapterText || parsed.selectedPassage,
+              bookName: parsed.bookName,
+            },
+            ["", `Frage:\n${question}`],
+          ),
         },
       ],
       max_tokens: 1200,
