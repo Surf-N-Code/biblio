@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 type Props = {
   usfm: string;
@@ -8,17 +8,22 @@ type Props = {
   chapter: number;
 };
 
+type Phase = "idle" | "loading" | "ready" | "error";
+
 export function PreviousChapterContextPanel({
   usfm,
   bookSlug,
   chapter,
 }: Props) {
   const [summary, setSummary] = useState<string | null>(null);
-  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
-  const [errorMessage, setErrorMessage] = useState("Kontext aus vorherigen Kapiteln konnte nicht geladen werden.");
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [errorMessage, setErrorMessage] = useState(
+    "Kontext aus vorherigen Kapiteln konnte nicht geladen werden.",
+  );
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadSummary = useCallback(async () => {
+    setPhase("loading");
+    setErrorMessage("Kontext aus vorherigen Kapiteln konnte nicht geladen werden.");
 
     const q = new URLSearchParams({
       usfm,
@@ -26,35 +31,45 @@ export function PreviousChapterContextPanel({
       chapter: String(chapter),
     });
 
-    fetch(`/api/bible/prev-summary?${q}`, { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(data.error || "Kontext aus vorherigen Kapiteln konnte nicht geladen werden.");
-        }
-        return res.json() as Promise<{ summary?: string | null }>;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const text = data.summary;
-        setSummary(
-          typeof text === "string" && text.trim().length > 0 ? text : null,
+    try {
+      const res = await fetch(`/api/bible/prev-summary?${q}`, { cache: "no-store" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(
+          data.error || "Kontext aus vorherigen Kapiteln konnte nicht geladen werden.",
         );
-        setPhase("ready");
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setErrorMessage(error instanceof Error ? error.message : "Kontext aus vorherigen Kapiteln konnte nicht geladen werden.");
-        setPhase("error");
-        setSummary(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      }
+      const data = (await res.json()) as { summary?: string | null };
+      const text = data.summary;
+      setSummary(typeof text === "string" && text.trim().length > 0 ? text : null);
+      setPhase("ready");
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Kontext aus vorherigen Kapiteln konnte nicht geladen werden.",
+      );
+      setPhase("error");
+      setSummary(null);
+    }
   }, [usfm, bookSlug, chapter]);
 
   if (phase === "ready" && !summary) return null;
+
+  if (phase === "idle") {
+    return (
+      <aside className="mt-6">
+        <button
+          type="button"
+          onClick={() => void loadSummary()}
+          className="rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
+        >
+          Kontext aus vorherigem Kapitel laden
+        </button>
+      </aside>
+    );
+  }
+
   if (phase === "error") {
     return (
       <aside
@@ -62,6 +77,13 @@ export function PreviousChapterContextPanel({
         role="status"
       >
         <p>{errorMessage}</p>
+        <button
+          type="button"
+          onClick={() => void loadSummary()}
+          className="mt-3 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 dark:border-zinc-600 dark:text-zinc-200"
+        >
+          Erneut versuchen
+        </button>
       </aside>
     );
   }

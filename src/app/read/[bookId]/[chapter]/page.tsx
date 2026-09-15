@@ -95,20 +95,20 @@ export default async function ReadChapterPage({ params }: PageProps) {
           <MarkChapterRead usfm={book.usfm} chapter={chapter} />
         </header>
 
+        {chapter > 1 ? (
+          <PreviousChapterContextPanel
+            key={`${book.usfm}-${chapter}`}
+            usfm={book.usfm}
+            bookSlug={book.slug}
+            chapter={chapter}
+          />
+        ) : null}
+
         <ChapterSwipeNav
           bookSlug={book.slug}
           chapter={chapter}
           maxChapter={book.chapters}
         >
-          {chapter > 1 ? (
-            <PreviousChapterContextPanel
-              key={`${book.usfm}-${chapter}`}
-              usfm={book.usfm}
-              bookSlug={book.slug}
-              chapter={chapter}
-            />
-          ) : null}
-
           <div className="mt-8">
             <ChapterReader
               bookName={book.name}
@@ -123,14 +123,14 @@ export default async function ReadChapterPage({ params }: PageProps) {
               germanToolFile={getDefaultGermanBibleFile()}
             />
           </div>
-
-          <ChapterNotesPanel
-            usfm={book.usfm}
-            bookSlug={book.slug}
-            bookName={book.name}
-            chapter={chapter}
-          />
         </ChapterSwipeNav>
+
+        <ChapterNotesPanel
+          usfm={book.usfm}
+          bookSlug={book.slug}
+          bookName={book.name}
+          chapter={chapter}
+        />
 
         <nav
           className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-zinc-200 pt-6 text-sm dark:border-zinc-800"

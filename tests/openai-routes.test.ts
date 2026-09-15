@@ -50,10 +50,12 @@ it("uses the OpenAI key for verse context", async () => {
   expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-4o" }));
 });
 
-it("answers a custom question with the selected verses in the prompt", async () => {
+it("answers a custom question with selected verses and full chapter context", async () => {
   const response = await ask(request("ask", {
     reference: "Genesis 1:1–2",
     passage: "1 In the beginning\n2 The earth was without form",
+    chapterText: "1 In the beginning\n2 The earth was without form\n3 And God said",
+    bookName: "Genesis",
     question: "Was bedeutet 'ohne Gestalt'?",
   }));
   expect(response.status).toBe(200);
@@ -70,6 +72,8 @@ it("answers a custom question with the selected verses in the prompt", async () 
   const userMessage = mocks.create.mock.calls[0][0].messages[1].content as string;
   expect(userMessage).toContain("Genesis 1:1–2");
   expect(userMessage).toContain("2 The earth was without form");
+  expect(userMessage).toContain("Ganzes Kapitel (Genesis):");
+  expect(userMessage).toContain("3 And God said");
 });
 
 it("rejects an empty custom question without contacting OpenAI", async () => {

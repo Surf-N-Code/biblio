@@ -50,6 +50,10 @@ function buildPassage(primary: ParsedVerse[], selected: Set<number>): string {
   return lines.join("\n");
 }
 
+function buildChapterText(primary: ParsedVerse[]): string {
+  return primary.map((v) => `${v.verse} ${v.text}`).join("\n");
+}
+
 function loadHighlights(key: string): HighlightMap {
   if (typeof window === "undefined") return {};
   try {
@@ -257,6 +261,18 @@ export function ChapterReader({
     [primary, selected],
   );
 
+  const chapterText = useMemo(() => buildChapterText(primary), [primary]);
+
+  const aiRequestBody = useMemo(
+    () => ({
+      reference,
+      passage: passageText,
+      chapterText,
+      bookName,
+    }),
+    [reference, passageText, chapterText, bookName],
+  );
+
   const recordGeneratedAnswer = async (kind: VerseAiKind, text: string) => {
     const response = await fetch("/api/bible/ai-answers", {
       method: "POST",
@@ -360,8 +376,7 @@ export function ChapterReader({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reference,
-          passage: passageText,
+          ...aiRequestBody,
           detail,
         }),
       });
@@ -396,8 +411,7 @@ export function ChapterReader({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reference,
-          passage: passageText,
+          ...aiRequestBody,
           ...(mhForContext ? { matthewHenryExcerpt: mhForContext } : {}),
         }),
       });
@@ -422,7 +436,7 @@ export function ChapterReader({
       const res = await fetch("/api/bible/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reference, passage: passageText, question }),
+        body: JSON.stringify({ ...aiRequestBody, question }),
       });
       const json = (await res.json()) as { text?: string; error?: string };
       if (!res.ok) throw new Error(json.error ?? "Frage fehlgeschlagen.");
@@ -752,7 +766,7 @@ export function ChapterReader({
                   Deine Frage zu {reference}
                 </label>
                 <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                  Die KI nutzt die ausgewählten Verse als Kontext.
+                  Die KI fokussiert auf deine Auswahl, kann aber das ganze Kapitel und weiteren Bibelkontext einbeziehen.
                 </p>
                 <textarea
                   id="ai-verse-question"
