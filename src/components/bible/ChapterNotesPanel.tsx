@@ -64,30 +64,42 @@ export function ChapterNotesPanel({
   const [draftBody, setDraftBody] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     setNotes(getNotesForChapter(usfm, chapter));
   }, [usfm, chapter]);
 
   useEffect(() => {
-    refresh();
+    const frame = requestAnimationFrame(refresh);
     window.addEventListener("biblio-notes-changed", refresh);
-    return () => window.removeEventListener("biblio-notes-changed", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("biblio-notes-changed", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, [refresh]);
 
   const submitNew = () => {
     const body = draftBody.trim();
     if (!body) return;
     const verses = parseVersesInput(draftVerses);
-    addVerseNote({
-      usfm,
-      bookSlug,
-      bookName,
-      chapter,
-      verses,
-      body,
-      source: "user",
-    });
+    try {
+      addVerseNote({
+        usfm,
+        bookSlug,
+        bookName,
+        chapter,
+        verses,
+        body,
+        source: "user",
+      });
+    } catch {
+      setError("Speichern fehlgeschlagen. Dein Entwurf bleibt erhalten. Bitte Browserspeicher prüfen.");
+      return;
+    }
+    setError(null);
     setDraftVerses("");
     setDraftBody("");
     refresh();
@@ -99,8 +111,14 @@ export function ChapterNotesPanel({
   };
 
   const saveEdit = () => {
-    if (!editingId) return;
-    updateVerseNote(editingId, editBody);
+    if (!editingId || !editBody.trim()) return;
+    try {
+      updateVerseNote(editingId, editBody);
+    } catch {
+      setError("Änderungen konnten nicht gespeichert werden. Dein Entwurf bleibt erhalten.");
+      return;
+    }
+    setError(null);
     setEditingId(null);
     refresh();
   };
@@ -126,6 +144,7 @@ export function ChapterNotesPanel({
         KI-Antworten findest du direkt beim jeweiligen Vers.
       </p>
 
+      {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
       <div className="mt-4 space-y-3">
         <div>
           <label htmlFor="note-verses" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
@@ -137,7 +156,7 @@ export function ChapterNotesPanel({
             value={draftVerses}
             onChange={(e) => setDraftVerses(e.target.value)}
             placeholder="z. B. 3 oder 1–5"
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-950"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-950"
           />
         </div>
         <div>
@@ -150,12 +169,13 @@ export function ChapterNotesPanel({
             onChange={(e) => setDraftBody(e.target.value)}
             rows={3}
             placeholder="Deine Gedanken …"
-            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-950"
+            className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-950"
           />
         </div>
         <button
           type="button"
           onClick={submitNew}
+          disabled={!draftBody.trim()}
           className="rounded-full bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
         >
           Notiz speichern
@@ -182,15 +202,17 @@ export function ChapterNotesPanel({
               {editingId === n.id ? (
                 <div className="mt-2 space-y-2">
                   <textarea
+                    aria-label="Notiz bearbeiten"
                     value={editBody}
                     onChange={(e) => setEditBody(e.target.value)}
                     rows={4}
-                    className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+                    className="w-full rounded border border-zinc-300 bg-white px-2 py-1.5 text-base dark:border-zinc-600 dark:bg-zinc-900"
                   />
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={saveEdit}
+                      disabled={!editBody.trim()}
                       className="rounded-full bg-zinc-900 px-3 py-1 text-xs text-white dark:bg-zinc-100 dark:text-zinc-900"
                     >
                       Speichern
@@ -206,7 +228,7 @@ export function ChapterNotesPanel({
                 </div>
               ) : (
                 <>
-                  <p className="mt-2 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+                  <p className="mt-2 whitespace-pre-wrap break-words text-zinc-700 dark:text-zinc-300">
                     {n.body}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">

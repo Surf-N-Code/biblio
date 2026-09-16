@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Copy, MessageCircle, MessageCircleQuestionMark, Orbit, ScrollText, Send, Sparkles, StickyNote } from "lucide-react";
-import { Drawer } from "vaul";
+import { VerseToolsDialog } from "./VerseToolsDialog";
 import { AiMarkdownModal } from "@/components/bible/AiMarkdownModal";
 import { cn } from "@/lib/utils/cn";
 import type { ParsedVerse } from "@/lib/bible/parse-chapter-html";
@@ -13,7 +13,6 @@ import {
   type VerseNoteAiKind,
 } from "@/lib/bible/reading-storage";
 import type { BibleReadLang } from "@/lib/bible/read-language";
-import { drawerViewportBounds, focusedControlScrollDelta } from "@/lib/bible/drawer-viewport";
 import { VERSE_AI_LABELS, type VerseAiAnswer, type VerseAiKind } from "@/lib/bible/verse-ai-answer";
 
 const HIGHLIGHT_PRESETS = [
@@ -160,7 +159,6 @@ export function ChapterReader({
   const [manualNotes, setManualNotes] = useState<VerseNote[]>([]);
   const [expandedNotesVerse, setExpandedNotesVerse] = useState<number | null>(null);
   const [openedNote, setOpenedNote] = useState<VerseNote | null>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
   const prevAiLoading = useRef<string | null>(null);
 
   useEffect(() => {
@@ -174,39 +172,6 @@ export function ChapterReader({
       window.removeEventListener("storage", refresh);
     };
   }, [usfm, chapter]);
-
-  useEffect(() => {
-    if (!drawerOpen) return;
-    const viewport = window.visualViewport;
-    let frame = 0;
-    const update = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const drawer = drawerRef.current;
-        if (!drawer) return;
-        const bounds = drawerViewportBounds(window.innerHeight, viewport?.height ?? window.innerHeight, viewport?.offsetTop ?? 0);
-        drawer.style.maxHeight = `${bounds.maxHeight}px`;
-        drawer.style.bottom = `${bounds.bottom}px`;
-        const active = document.activeElement;
-        if (!(active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) || !drawer.contains(active)) return;
-        const containerRect = drawer.getBoundingClientRect();
-        const fieldRect = active.getBoundingClientRect();
-        drawer.scrollTop += focusedControlScrollDelta(fieldRect.top, fieldRect.bottom, containerRect.top + 12, containerRect.bottom - 12);
-      });
-    };
-    update();
-    viewport?.addEventListener("resize", update);
-    viewport?.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
-    document.addEventListener("focusin", update);
-    return () => {
-      cancelAnimationFrame(frame);
-      viewport?.removeEventListener("resize", update);
-      viewport?.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-      document.removeEventListener("focusin", update);
-    };
-  }, [drawerOpen]);
 
   useEffect(() => {
     setHighlights(loadHighlights(storageKey));
@@ -513,15 +478,12 @@ export function ChapterReader({
       window.setTimeout(() => setToast(null), 2000);
       return;
     }
-    addVerseNote({
-      usfm,
-      bookSlug,
-      bookName,
-      chapter,
-      verses: selectedVerseNums,
-      body,
-      source: "user",
-    });
+    try {
+      addVerseNote({ usfm, bookSlug, bookName, chapter, verses: selectedVerseNums, body, source: "user" });
+    } catch {
+      setToast("Speichern fehlgeschlagen. Dein Entwurf bleibt erhalten. Bitte Browserspeicher prüfen.");
+      return;
+    }
     setNoteDraft("");
     setToast("Notiz gespeichert.");
     window.setTimeout(() => setToast(null), 2000);
@@ -704,27 +666,38 @@ export function ChapterReader({
         )}
       </div>
 
-      <Drawer.Root
-        shouldScaleBackground={false}
-        repositionInputs={false}
-        handleOnly
-        dismissible={false}
+      <VerseToolsDialog
         open={drawerOpen && selected.size > 0}
-        onOpenChange={(open) => {
-          if (open) setDrawerOpen(true);
-          else closeTools();
-        }}
+        onClose={closeTools}
+        reference={reference}
+        onSaveNote={saveUserNoteFromDrawer}
+        canSaveNote={!!noteDraft.trim()}
+        status={toast}
       >
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
-          <Drawer.Content ref={drawerRef} className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[96vh] min-h-0 flex-col overflow-y-auto overscroll-contain [&>*]:shrink-0 rounded-t-2xl border border-zinc-200 bg-white p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl dark:border-zinc-800 dark:bg-zinc-950 sm:max-h-[88vh] sm:p-4 sm:pb-8">
-            <button type="button" onClick={closeTools} className="mb-2 self-end rounded-full border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600">Schließen</button>
-            <Drawer.Title className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              Ausgewählte Verse
-            </Drawer.Title>
-            <Drawer.Description className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              {reference}
-            </Drawer.Description>
+            <div data-vaul-no-drag className="space-y-2">
+              <label htmlFor="verse-manual-note" className="block text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                Notizen zu dieser Auswahl
+              </label>
+              <textarea
+                id="verse-manual-note"
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                rows={3}
+                placeholder="Eigene Notiz …"
+                className="block w-full min-h-24 resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+              />
+              <div className="flex flex-wrap gap-2">
+                {aiPanel && !aiLoading && (
+                  <button
+                    type="button"
+                    onClick={saveAiPanelAsNote}
+                    className="rounded-full border border-emerald-600 px-3 py-1.5 text-sm text-emerald-800 dark:border-emerald-500 dark:text-emerald-200"
+                  >
+                    KI-Text als Notiz speichern
+                  </button>
+                )}
+              </div>
+            </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
               {HIGHLIGHT_PRESETS.map((h) => (
@@ -779,7 +752,7 @@ export function ChapterReader({
               </div>
             </div>
 
-            <div className="mt-3 flex min-h-14 flex-nowrap items-center justify-start gap-2 overflow-x-auto py-1">
+            <div className="mt-3 flex min-h-14 flex-wrap items-center justify-start gap-2 py-1">
               <button
                 type="button"
                 onClick={() => runExplain("brief")}
@@ -924,51 +897,13 @@ export function ChapterReader({
               </p>
             )}
 
-            <div data-vaul-no-drag className="mt-4 space-y-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-              <label htmlFor="verse-manual-note" className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Notizen zu dieser Auswahl
-              </label>
-              <textarea
-                id="verse-manual-note"
-                value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
-                rows={3}
-                placeholder="Eigene Notiz …"
-                className="w-full min-h-[7.5rem] rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 sm:min-h-0"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={saveUserNoteFromDrawer}
-                  className="rounded-full border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600"
-                >
-                  Eigene Notiz speichern
-                </button>
-                {aiPanel && !aiLoading && (
-                  <button
-                    type="button"
-                    onClick={saveAiPanelAsNote}
-                    className="rounded-full border border-emerald-600 px-3 py-1.5 text-sm text-emerald-800 dark:border-emerald-500 dark:text-emerald-200"
-                  >
-                    KI-Text als Notiz speichern
-                  </button>
-                )}
-              </div>
-            </div>
 
-            {toast && (
-              <p className="mt-3 text-center text-sm text-emerald-700 dark:text-emerald-400" role="status">
-                {toast}
-              </p>
-            )}
             <AiMarkdownModal
               open={aiModalOpen}
               onOpenChange={setAiModalOpen}
               markdown={aiPanel}
             />
-          </Drawer.Content>
-        </Drawer.Portal>
-      </Drawer.Root>
+      </VerseToolsDialog>
       {historyError && (
         <p className="mt-4 text-sm text-amber-700 dark:text-amber-300" role="status">
           Deine gespeicherten KI-Antworten konnten gerade nicht geladen werden. Lade die Seite später neu.
