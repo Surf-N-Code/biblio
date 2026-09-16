@@ -105,6 +105,7 @@ export default async function ReadChapterPage({ params }: PageProps) {
         ) : null}
 
         <ChapterSwipeNav
+          key={`${book.slug}:${chapter}`}
           bookSlug={book.slug}
           chapter={chapter}
           maxChapter={book.chapters}
