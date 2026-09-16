@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, MessageCircle, MessageCircleQuestionMark, Orbit, ScrollText, Send, Sparkles } from "lucide-react";
+import { Copy, MessageCircle, MessageCircleQuestionMark, Orbit, ScrollText, Send, Sparkles, StickyNote } from "lucide-react";
 import { Drawer } from "vaul";
 import { AiMarkdownModal } from "@/components/bible/AiMarkdownModal";
 import { cn } from "@/lib/utils/cn";
 import type { ParsedVerse } from "@/lib/bible/parse-chapter-html";
 import {
   addVerseNote,
+  getNotesForChapter,
+  type VerseNote,
   type VerseNoteAiKind,
 } from "@/lib/bible/reading-storage";
 import type { BibleReadLang } from "@/lib/bible/read-language";
+import { drawerViewportBounds, focusedControlScrollDelta } from "@/lib/bible/drawer-viewport";
 import { VERSE_AI_LABELS, type VerseAiAnswer, type VerseAiKind } from "@/lib/bible/verse-ai-answer";
 
 const HIGHLIGHT_PRESETS = [
@@ -154,7 +157,56 @@ export function ChapterReader({
   const [historySaveWarning, setHistorySaveWarning] = useState(false);
   const [expandedHistoryVerse, setExpandedHistoryVerse] = useState<number | null>(null);
   const [historyModalText, setHistoryModalText] = useState<string | null>(null);
+  const [manualNotes, setManualNotes] = useState<VerseNote[]>([]);
+  const [expandedNotesVerse, setExpandedNotesVerse] = useState<number | null>(null);
+  const [openedNote, setOpenedNote] = useState<VerseNote | null>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const prevAiLoading = useRef<string | null>(null);
+
+  useEffect(() => {
+    const refresh = () => setManualNotes(getNotesForChapter(usfm, chapter).filter((note) => note.source === "user"));
+    const frame = requestAnimationFrame(refresh);
+    window.addEventListener("biblio-notes-changed", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("biblio-notes-changed", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [usfm, chapter]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const viewport = window.visualViewport;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const drawer = drawerRef.current;
+        if (!drawer) return;
+        const bounds = drawerViewportBounds(window.innerHeight, viewport?.height ?? window.innerHeight, viewport?.offsetTop ?? 0);
+        drawer.style.maxHeight = `${bounds.maxHeight}px`;
+        drawer.style.bottom = `${bounds.bottom}px`;
+        const active = document.activeElement;
+        if (!(active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement) || !drawer.contains(active)) return;
+        const containerRect = drawer.getBoundingClientRect();
+        const fieldRect = active.getBoundingClientRect();
+        drawer.scrollTop += focusedControlScrollDelta(fieldRect.top, fieldRect.bottom, containerRect.top + 12, containerRect.bottom - 12);
+      });
+    };
+    update();
+    viewport?.addEventListener("resize", update);
+    viewport?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    document.addEventListener("focusin", update);
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport?.removeEventListener("resize", update);
+      viewport?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      document.removeEventListener("focusin", update);
+    };
+  }, [drawerOpen]);
 
   useEffect(() => {
     setHighlights(loadHighlights(storageKey));
@@ -500,6 +552,17 @@ export function ChapterReader({
 
   const showSelectionBar = selected.size > 0 && !drawerOpen;
 
+  const closeTools = () => {
+    setDrawerOpen(false);
+    setSelected(new Set());
+    setAiPanel(null);
+    setAiModalOpen(false);
+    setMhText(null);
+    setNoteDraft("");
+    setQuestionOpen(false);
+    setQuestionDraft("");
+  };
+
   return (
     <div className="w-full">
       {showSelectionBar && (
@@ -535,6 +598,7 @@ export function ChapterReader({
               const selectedRow = selected.has(v.verse);
               const hl = highlightClassForVerse(v.verse);
               const verseAnswers = answersByVerse.get(v.verse) ?? [];
+              const verseNotes = manualNotes.filter((note) => note.usfm.toUpperCase() === usfm.toUpperCase() && note.chapter === chapter && note.verses.includes(v.verse));
               return (
                 <div key={v.verse}>
                   <div className="flex items-start gap-1">
@@ -556,6 +620,18 @@ export function ChapterReader({
                       </sup>
                       <span className="flex-1">{v.text}</span>
                     </button>
+                    {verseNotes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedNotesVerse(expandedNotesVerse === v.verse ? null : v.verse)}
+                        aria-expanded={expandedNotesVerse === v.verse}
+                        aria-label={`${verseNotes.length} ${verseNotes.length === 1 ? "Notiz" : "Notizen"} zu Vers ${v.verse} anzeigen`}
+                        className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-amber-300 px-2 text-xs font-medium text-amber-800 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-950"
+                      >
+                        <StickyNote className="h-4 w-4" aria-hidden />
+                        {verseNotes.length}
+                      </button>
+                    )}
                     {verseAnswers.length > 0 && (
                       <button
                         type="button"
@@ -570,6 +646,21 @@ export function ChapterReader({
                       </button>
                     )}
                   </div>
+                  {expandedNotesVerse === v.verse && verseNotes.length > 0 && (
+                    <section className="ml-8 mt-1 mb-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900 dark:bg-amber-950/40" aria-label={`Notizen zu Vers ${v.verse}`}>
+                      <p className="mb-2 text-sm font-semibold">Notizen zu Vers {v.verse}</p>
+                      <ul className="space-y-2">
+                        {verseNotes.map((note) => (
+                          <li key={note.id}>
+                            <button type="button" onClick={() => setOpenedNote(note)} className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-left text-sm hover:bg-amber-100 dark:border-amber-800 dark:bg-zinc-900 dark:hover:bg-amber-950">
+                              <span className="block whitespace-pre-wrap line-clamp-2">{note.body}</span>
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400">{new Date(note.updatedAt).toLocaleString("de-DE")}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
                   {expandedHistoryVerse === v.verse && verseAnswers.length > 0 && (
                     <section className="ml-8 mt-1 mb-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3 dark:border-sky-900 dark:bg-sky-950/40" aria-label={`KI-Antworten zu Vers ${v.verse}`}>
                       <p className="mb-2 text-sm font-semibold">KI-Antworten zu Vers {v.verse}</p>
@@ -615,25 +706,19 @@ export function ChapterReader({
 
       <Drawer.Root
         shouldScaleBackground={false}
-        dismissible={!aiModalOpen && !questionOpen}
+        repositionInputs={false}
+        handleOnly
+        dismissible={false}
         open={drawerOpen && selected.size > 0}
         onOpenChange={(open) => {
-          setDrawerOpen(open);
-          if (!open) {
-            setSelected(new Set());
-            setAiPanel(null);
-            setAiModalOpen(false);
-            setMhText(null);
-            setNoteDraft("");
-            setQuestionOpen(false);
-            setQuestionDraft("");
-          }
+          if (open) setDrawerOpen(true);
+          else closeTools();
         }}
       >
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 z-40 bg-black/40" />
-          <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[96vh] min-h-0 flex-col overflow-y-auto rounded-t-2xl border border-zinc-200 bg-white p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl dark:border-zinc-800 dark:bg-zinc-950 sm:max-h-[88vh] sm:p-4 sm:pb-8">
-            <div className="mx-auto mb-3 h-1.5 w-12 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+          <Drawer.Content ref={drawerRef} className="fixed bottom-0 left-0 right-0 z-50 flex max-h-[96vh] min-h-0 flex-col overflow-y-auto overscroll-contain [&>*]:shrink-0 rounded-t-2xl border border-zinc-200 bg-white p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl dark:border-zinc-800 dark:bg-zinc-950 sm:max-h-[88vh] sm:p-4 sm:pb-8">
+            <button type="button" onClick={closeTools} className="mb-2 self-end rounded-full border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-600">Schließen</button>
             <Drawer.Title className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
               Ausgewählte Verse
             </Drawer.Title>
@@ -839,11 +924,12 @@ export function ChapterReader({
               </p>
             )}
 
-            <div className="mt-4 space-y-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
-              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            <div data-vaul-no-drag className="mt-4 space-y-2 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+              <label htmlFor="verse-manual-note" className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 Notizen zu dieser Auswahl
-              </p>
+              </label>
               <textarea
+                id="verse-manual-note"
                 value={noteDraft}
                 onChange={(e) => setNoteDraft(e.target.value)}
                 rows={3}
@@ -892,6 +978,13 @@ export function ChapterReader({
         open={historyModalText !== null}
         onOpenChange={(open) => { if (!open) setHistoryModalText(null); }}
         markdown={historyModalText}
+      />
+      <AiMarkdownModal
+        open={openedNote !== null}
+        onOpenChange={(open) => { if (!open) setOpenedNote(null); }}
+        markdown={openedNote?.body ?? null}
+        title="Deine Notiz"
+        plainText
       />
     </div>
   );

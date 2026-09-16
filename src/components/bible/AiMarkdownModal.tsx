@@ -99,9 +99,11 @@ export type AiMarkdownModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   markdown: string | null;
+  title?: string;
+  plainText?: boolean;
 };
 
-export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModalProps) {
+export function AiMarkdownModal({ open, onOpenChange, markdown, title = "KI-Antwort", plainText = false }: AiMarkdownModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -137,7 +139,7 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
           <h2 id={titleId} className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-            KI-Antwort
+            {title}
           </h2>
           <button
             type="button"
@@ -148,7 +150,9 @@ export function AiMarkdownModal({ open, onOpenChange, markdown }: AiMarkdownModa
           </button>
         </header>
         <div className="min-h-0 min-w-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch]">
-          {markdown?.trim() ? (
+          {plainText ? (
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">{markdown}</p>
+          ) : markdown?.trim() ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
               {markdown}
             </ReactMarkdown>
